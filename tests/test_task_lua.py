@@ -21,6 +21,7 @@ class TaskLuaTests(unittest.TestCase):
             hl.dsp.window.resize = function(value) return value end
             hl.dsp.window.move = function(value) return value end
             hl.plugin.floatland.remember_preview = function(...) record('preview', ...) end
+            hl.plugin.floatland.prepare_tab = function(...) record("prepare-tab", ...) end
             hl.plugin.floatland.prepare_overview = function(...) record('prepare', ...) end
             hl.plugin.floatland.selection_valid = function(token) return token == 7 end
             hl.plugin.floatland.finish_selection = function(...) record('finish', ...) end
@@ -60,6 +61,18 @@ class TaskLuaTests(unittest.TestCase):
         self.assertEqual(value.title_alignment,'center')
         self.assertIs(value.snap_palette,False)
         self.assertEqual(value.button_highlight,.3)
+
+    def test_switcher_preview_generation_is_forwarded(self):
+        self.ipc.prepare_switcher(19)
+        self.assertEqual(self.lua.globals().calls[1][1], 'prepare-tab')
+        self.assertEqual(self.lua.globals().calls[1][2], 19)
+
+    def test_switcher_styles_are_validated(self):
+        for style in ('icons','preview','legacy'):
+            self.ipc.configure_appearance({'tab_style':style,'tab_mouse':False,'tab_preview_width':280})
+            self.assertEqual(self.lua.globals().appearance.tab_style,style)
+            self.assertIs(self.lua.globals().appearance.tab_mouse,False)
+        with self.assertRaises(ValueError): self.ipc.configure_appearance({'tab_style':'bad'})
 
     def test_overview_generation_and_ack_lua(self):
         self.ipc.prepare_overview(7)

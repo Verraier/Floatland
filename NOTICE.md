@@ -50,3 +50,4 @@ Floatland's native task panel extends the existing code in `native/`.
 | hyprbars (hyprland-plugins) | Hypr Development | BSD-3-Clause | native/titlebar.cpp derived; notice in native/LICENSE.hyprbars |
 | Hyprland | vaxerski and contributors | BSD-3-Clause | compositor and plugin API (v0.56.2) |
 | Hyprtasking | Raymond Bian and contributors | BSD-3-Clause | overview API/input behaviour reference; optional external plugin |
+| Qt (qtwayland private APIs) | The Qt Company and contributors | LGPL-3.0 / GPL-3.0 / commercial | optional `integrations/qt` prototype links against the user's own Qt; no Qt source is vendored |

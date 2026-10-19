@@ -1,10 +1,12 @@
-# Floatland settings (0.6.1)
+# Floatland settings (0.6.5e)
 
 Working directory: `$XDG_CONFIG_HOME/floatland` or `~/.config/floatland`.
 `python3 run.py config init` creates the files; `config show` validates them without Hyprland;
 `reload` applies them in a running unified session. During a normal `run.py` session, Lua changes
 are also applied automatically after a short pause in saving.
 `config reference` prints the new templates with English comments without changing user files.
+`config format` rewrites old auto-generated Lua files into commented templates, keeping the values;
+the originals are kept next to them as `*.lua.before-format`. Files without a migration marker are not touched.
 For another directory, `config init/show/path` accept `--dir /path`; this does not change the
 directory of the running session.
 
@@ -143,7 +145,7 @@ the interface commands available.
 `bindings.lua` uses Linux evdev codes: 15 = Tab, 34 = G. The modifiers are fixed: Alt for the
 switcher and Super for the overview. Navigation keys, Esc, Enter and modifier codes are reserved.
 Arbitrary bindings for other actions are still set in the Hyprland config, not in this file.
-Note: reverse switching with Alt+Shift+Tab is present in the code but does not work yet.
+Note: reverse switching with Alt+Shift+Tab does not work yet.
 
 `button_shift` sets a small shift of the button center, `button_stretch` sets the deformation in
 the direction of the mouse; 0 turns the corresponding effect off. `rebound = 0` turns off the
@@ -178,7 +180,7 @@ In `titlebars.lua`:
 | Field | Default | Purpose |
 | --- | --- | --- |
 | buttons_side | "right" | left/right — side of the button group |
-| buttons_order | {"maximize", "minimize", "close"} | Order left to right; omitted buttons are hidden; {} hides all |
+| buttons_order | {"maximize", "minimize", "close"} | Order from the inside of the window to the outer edge; mirrored when on the left (default close → minimize → maximize); omitted buttons are hidden; {} hides all |
 | title_alignment | "left" | left/center/right, in the free space after the buttons |
 | title_enabled | true | Show the title text |
 | icons | true | Action icons |
@@ -203,3 +205,42 @@ Files outside the directory and changes to environment variables are not tracked
 use a manual reload for them. Lua runs in a separate process, and waiting is moved out of the
 daemon loop. Saving during a read rejects the intermediate result. Deleting `init.lua` does not
 reset the settings: an error appears in the log.
+
+## switching.lua additions (0.6.2e)
+
+| Field | Default | Range / type |
+| --- | --- | --- |
+| `style` | `"icons"` | `"icons"`, `"preview"` or `"legacy"` |
+| `mouse` | `true` | Hover selects; release Alt or click to activate |
+| `preview_width` | `240` | 160–360 (integer), maximum preview-card width in logical px |
+
+`icon_size` stays the maximum for the adaptive styles and a fixed size for `legacy`.
+To roll back to 0.6.1.1, remove these three fields from your file first: the old version does not know them.
+
+- `icons`: square rounded cards that adapt to the number of windows and the screen; only the
+  selected window shows a label. With many windows there are pages reachable with Tab.
+- `preview`: cards with thumbnails in several rows. Snapshots are prepared one at a time and a
+  repeated Tab on the same page does not re-create them. These are static snapshots, not live video.
+- `legacy`: the former fixed-size scheme with permanent labels.
+
+## Persistent application sizes (0.6.2e)
+
+`windows.remember_sizes` defaults to `true`. Normal floating sizes are saved atomically
+to `$XDG_STATE_HOME/floatland/window-sizes.json` (default `~/.local/state`).
+The key is `initialClass`, falling back to `class`. Titles and process IDs are not persisted.
+The last changed window of a class wins. Snap/fullscreen/minimized sizes are excluded.
+Sampling runs once per second and on controller refresh; a resize immediately followed
+by external close may retain the previous sample. Invalid files are preserved and logged.
+Set `remember_sizes = false` to disable both recording and restoration.
+
+## Overview ordering (0.6.3e)
+
+Overview has no new settings. Windows are ordered by application class, then by decreasing
+window area within a class; focus history does not reorder them. The label is shown only for
+the selected window.
+
+## Qt client-side titlebar (0.6.5e, experimental)
+
+Titlebar appearance settings (colors, button side/order, title alignment) are also exported to
+the optional Qt prototype while its launcher runs. See
+[integrations/qt/README.md](../integrations/qt/README.md).

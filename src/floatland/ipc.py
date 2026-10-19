@@ -71,6 +71,9 @@ class Hyprland:
         self.evaluate('assert(hl.plugin.floatland.tasks, "Floatland native task UI not loaded"); '
                       'hl.plugin.floatland.tasks(' + str(kind) + ',{' + entries + '},' + str(selected) + ')', 'task switcher')
 
+    def prepare_switcher(self, generation):
+        self.evaluate("hl.plugin.floatland.prepare_tab(" + str(int(generation)) + ")", "prepare switcher")
+
     def prepare_overview(self, generation):
         self.evaluate('hl.plugin.floatland.prepare_overview(' + str(int(generation)) + ')', 'prepare overview')
 

@@ -33,7 +33,7 @@ def parser():
     commands.add_parser('start', help='Start the unified session from this checkout')
     commands.add_parser('reload', help='Validate and reload Floatland configuration')
     configuration = commands.add_parser('config', help='Manage Lua settings without a compositor')
-    configuration.add_argument('config_action', choices=['init', 'show', 'path', 'reference'])
+    configuration.add_argument('config_action', choices=['init', 'show', 'path', 'reference', 'format'])
     configuration.add_argument('--dir', dest='config_dir')
     daemon = commands.add_parser("daemon", help="Run in foreground; keep this terminal open and use a second terminal for commands")
     daemon.add_argument("--config")
@@ -84,6 +84,10 @@ def main():
                 from pathlib import Path
                 for template in sorted((Path(__file__).parent/'defaults'/'config').glob('*.lua')):
                     print('-- config/' + template.name + '\n' + template.read_text())
+            elif args.config_action == 'format':
+                from .lua_config import format_migrated
+                changed = format_migrated(root)
+                print('Formatted migrated files (backups: *.before-format):\n' + '\n'.join(changed) if changed else 'No generated migration files to format.')
             elif args.config_action == 'path':
                 print(root / 'init.lua')
             else:

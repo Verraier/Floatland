@@ -239,6 +239,12 @@ static int appearanceLua(lua_State* L) {
     const auto next_snap_edges=boolean("snap_edges");
     const auto next_snap_preview=boolean("snap_preview");
     if (!validButtonOrder(next_buttons_order)) return luaL_error(L,"invalid buttons_order");
+    const auto next_tab_style=textValue("tab_style");
+    if(next_tab_style!="icons" && next_tab_style!="preview" && next_tab_style!="legacy")
+        return luaL_error(L,"invalid tab_style");
+    const auto next_tab_mouse=boolean("tab_mouse");
+    const auto next_tab_preview_width=number("tab_preview_width",160,360);
+    if(std::floor(next_tab_preview_width)!=next_tab_preview_width) return luaL_error(L,"preview_width must be an integer");
     // Commit only after every field has passed validation.
     Style::titlebar=next_titlebar;
     Style::titlebarOpacity=next_titlebarOpacity;
@@ -289,6 +295,9 @@ static int appearanceLua(lua_State* L) {
     if (captured && click.pressed != Control::None) {
         captured->releaseButton(); captured=nullptr; click.active=false;
     }
+    Style::tab_style=next_tab_style;
+    Style::tab_mouse=next_tab_mouse;
+    Style::tab_preview_width=next_tab_preview_width;
     TaskUI::hide();
     TaskUI::flow.enterSeconds=Style::overviewEnterDuration;
     TaskUI::flow.exitSeconds=Style::overviewExitDuration;
@@ -576,6 +585,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
         !HyprlandAPI::addLuaFunction(handle, "floatland", "refresh", refreshLua))
         throw std::runtime_error("Floatland: could not register geometry bridge");
     if (!HyprlandAPI::addLuaFunction(handle, "floatland", "tasks", TaskUI::show) ||
+        !HyprlandAPI::addLuaFunction(handle, "floatland", "prepare_tab", TaskUI::prepareTab) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "prepare_overview", TaskUI::prepareOverview) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "selection_valid", TaskUI::selectionValid) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "finish_selection", TaskUI::finishSelection) ||
@@ -586,7 +596,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     OverviewFilter::install(handle);
     try { listeners = makeUnique<Listeners>(); resyncBars(); }
     catch(...) { listeners.reset(); OverviewFilter::remove(handle); throw; }
-    return {"floatland-bars", "Native floating titlebars with shared render/input geometry", "Floatland / Hypr Development", "0.6.1.1"};
+    return {"floatland-bars", "Native floating titlebars with shared render/input geometry", "Floatland / Hypr Development", "0.6.5e"};
 }
 APICALL EXPORT void PLUGIN_EXIT() {
     TaskUI::reset();

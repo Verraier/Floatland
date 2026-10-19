@@ -25,6 +25,9 @@ int main() {
     assert(negativeRuns==1);
     assert(buttonReturn(10)==0);
 
+    assert(buttonRect(800,Control::Close,true).x < buttonRect(800,Control::Maximize,true).x);
+    assert(buttonRect(800,Control::Close,false).x > buttonRect(800,Control::Maximize,false).x);
+
     // All six action orders must share the exact geometry used by hit testing.
     for(const std::string order : {"close,minimize,maximize","close,maximize,minimize",
             "minimize,close,maximize","minimize,maximize,close","maximize,close,minimize","maximize,minimize,close","close",""}) {
@@ -32,11 +35,11 @@ int main() {
         for(bool left : {false,true}) for(double width : {40.,80.,110.,800.}) {
             const auto layout=buttonOrder(order);
             const auto title=titleRect(width,left,layout);
-            double previous=-1;
+            double previous=left?width+1:-1;
             for(auto action:layout) {
                 const auto b=buttonRect(width,action,left,layout);
                 if(b.w==0) continue;
-                assert(b.x>previous); previous=b.x;
+                assert(left ? b.x<previous : b.x>previous); previous=b.x;
                 assert(hit({0,0,width,32},{b.x+16,16},left,layout)==action);
                 assert(title.w==0 || title.x+title.w<=b.x || title.x>=b.x+b.w);
             }
@@ -126,7 +129,7 @@ int main() {
     assert(easeOverview(0)==0 && easeOverview(1)==1);
     const auto halfway=interpolate({10,20,100,80},{110,220,200,160},.5);
     assert(halfway.x==60 && halfway.y==120 && halfway.w==150 && halfway.h==120);
-    for (int count=1;count<=64;++count) {
+    for (int count=1;count<=100;++count) {
         for (Rect bounds : {Rect{-1920,40,1800,900},Rect{40,60,720,480}}) {
             std::vector<Point> sizes;
             for(int i=0;i<count;++i) sizes.push_back({i%2?500.0:1400.0,i%2?1200.0:700.0});
@@ -152,6 +155,18 @@ int main() {
     assert(preview.x+preview.w<=few[0].x+few[0].w);
     assert(preview.y+preview.h<=few[0].y+few[0].h);
     assert(std::abs(preview.w/preview.h-1000./700)<1e-9);
+    const std::vector<Point> mixedSources{{3840,2160},{1000,700},{500,900}};
+    const auto balanced=overviewCards(overviewBounds,mixedSources);
+    const auto large=overviewPreview(balanced[0],mixedSources[0]);
+    const auto medium=overviewPreview(balanced[1],mixedSources[1]);
+    assert(large.w*large.h < medium.w*medium.h*2);
+    const auto repeated=overviewCards(overviewBounds,mixedSources);
+    for(size_t i=0;i<balanced.size();++i) {
+        assert(balanced[i].x==repeated[i].x && balanced[i].y==repeated[i].y);
+        const auto fitted=overviewPreview(balanced[i],mixedSources[i]);
+        assert(std::abs(fitted.w/fitted.h-mixedSources[i].x/mixedSources[i].y)<1e-9);
+        assert(fitted.w<=mixedSources[i].x && fitted.h<=mixedSources[i].y);
+    }
     Click click;
     click.begin(Control::Close, {0, 0});
     assert(click.release(Control::Maximize, false) == Control::None);

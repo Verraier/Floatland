@@ -3,6 +3,7 @@ import importlib.util
 import json
 import logging
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -25,6 +26,7 @@ SECTIONS = {
                  'enter_duration':'overview_enter_duration','exit_duration':'overview_exit_duration'},
     'switching': {'enabled':'switching_enabled','color':'tab_color','opacity':'tab_opacity',
                   'font_size':'tab_font_size','icon_size':'tab_icon_size',
+                  'style':'tab_style','mouse':'tab_mouse','preview_width':'tab_preview_width',
                   'enter_duration':'tab_enter_duration','exit_duration':'tab_exit_duration'},
     'bindings': {'enabled':'bindings_enabled','alt_tab_key':'alt_tab_key','overview_key':'overview_key'},
     'theme': {'titlebar':'titlebar_color','text':'titlebar_text_color','snap':'snap_color','switching':'tab_color','overview':'overview_color'},
@@ -165,6 +167,64 @@ def lua_value(value):
     raise ValueError('Unsupported migration value')
 
 
+def documented_table(template, values):
+    """Keep template explanations while substituting migrated literal values."""
+    remaining = dict(values)
+    lines = []
+    pattern = re.compile(r'^(\s*)(--\s*)?([A-Za-z_][A-Za-z_0-9]*)\s*=.*?(?:\s+--(.*))?$')
+    for line in template.splitlines():
+        match = pattern.match(line)
+        if match:
+            indent, commented, key, explanation = match.groups()
+            if key in remaining:
+                line = indent + key + ' = ' + lua_value(remaining.pop(key)) + ','
+                if explanation:
+                    line += ' --' + explanation
+            elif not commented:
+                line = indent + '-- ' + line.lstrip()
+        if line.strip() == '}':
+            for key, value in remaining.items():
+                name = key if re.fullmatch(r'[A-Za-z_][A-Za-z_0-9]*', key) else '['+lua_string(key)+']'
+                lines.append('    '+name+' = '+lua_value(value)+',')
+            remaining.clear()
+        lines.append(line)
+    if remaining:
+        return '-- Migrated settings.\nreturn '+lua_value(values)+'\n'
+    return '\n'.join(lines)+'\n'
+
+
+def format_migrated(root):
+    """Explicitly upgrade generated files; keep backups and skip handwritten files."""
+    root = Path(root)
+    load_lua(root / 'init.lua')  # Validate the complete configuration before writing.
+    templates = Path(__file__).with_name('defaults') / 'config'
+    changes = []
+    marker = '-- Migrated from config.json; original JSON preserved.'
+    for name in SECTIONS:
+        path = root / 'config' / (name + '.lua')
+        if not path.exists():
+            continue
+        original = path.read_text()
+        if marker not in original:
+            continue
+        values = read_lua(path)
+        text = documented_table((templates / path.name).read_text(), values)
+        backup = path.with_name(path.name + '.before-format')
+        index = 1
+        while backup.exists():
+            backup = path.with_name(path.name + '.before-format.' + str(index))
+            index += 1
+        changes.append((path, backup, original, text))
+    for path, backup, original, text in changes:
+        with backup.open('x') as file:
+            file.write(original)
+        temporary = path.with_name(path.name + '.format-tmp')
+        with temporary.open('x') as file:
+            file.write(text)
+        temporary.replace(path)
+    return [str(path) for path, _, _, _ in changes]
+
+
 def initialize(root):
     """Publish init.lua last; never replace user files or remove legacy JSON."""
     from .config import validate
@@ -190,8 +250,7 @@ def initialize(root):
                 data = {key:value for key,value in data.items() if mapping[key] not in shared}
             if name == 'titlebars' and 'buttons_order' in data:
                 data['buttons_order'] = data['buttons_order'].split(',') if data['buttons_order'] else []
-            comments = '\n'.join(line for line in text.splitlines() if line.lstrip().startswith('--'))
-            text = comments+'\n-- Migrated from config.json; original JSON preserved.\nreturn '+lua_value(data)+'\n'
+            text = '-- Migrated from config.json; original JSON preserved.\n' + documented_table(text, data)
         try:
             with target.open('x') as file: file.write(text)
         except FileExistsError:

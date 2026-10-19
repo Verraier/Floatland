@@ -4,6 +4,8 @@
 #include <set>
 #include "style.hpp"
 #include "overview-layout.hpp"
+#include "switcher-layout.hpp"
+#include "switcher-preparation.hpp"
 #include "overview-flow.hpp"
 #include <librsvg/rsvg.h>
 #include <hyprland/src/render/Framebuffer.hpp>
@@ -30,6 +32,20 @@ static std::set<uint32_t> swallowed;
 static SP<Render::ITexture> texture;
 static std::string textureKey;
 static std::vector<std::string> icons;
+static Floatland::SwitcherLayout tabLayout;
+static Floatland::SwitcherPreparation tabPreparation;
+static double tabPixels=0;
+static bool tabPreview() { return kind==1 && Floatland::Style::tab_style=="preview"; }
+static bool tabLegacy() { return Floatland::Style::tab_style=="legacy"; }
+static void layoutTabs() {
+    const auto m=monitor.lock();
+    if(!m) return;
+    tabLayout=Floatland::switcherLayout({m->m_position.x,m->m_position.y,m->m_size.x,m->m_size.y},
+        static_cast<int>(windows.size()),selected,Floatland::Style::iconSize,Floatland::Style::fontSize,
+        tabPreview(),tabLegacy(),Floatland::Style::tab_preview_width);
+    first=tabLayout.first;
+}
+
 struct Preview { SP<Render::IFramebuffer> fb; Floatland::Rect source; Vector2D monitorSize; Floatland::Rect origin; };
 static std::vector<Preview> previews;
 struct SavedPreview { PHLWINDOWREF window; Preview preview; double pixels; };
@@ -66,6 +82,7 @@ static void damage() {
     if (auto m = monitor.lock()) g_pHyprRenderer->damageMonitor(m);
 }
 static void hide() {
+    tabPreparation.cancel(); tabLayout={};
     flow.reset(); chosen.reset();
     damage(); kind=0; overview=closing=pending=false;
     texture.reset(); textureKey.clear(); previews.clear(); cards.clear();
@@ -117,6 +134,7 @@ static PHLWINDOW find(const std::string& address, int pid) {
 static double tabStep() { return Floatland::Style::iconSize+32.0; }
 static double tabHeight() { return Floatland::Style::iconSize+Floatland::Style::fontSize+52.0; }
 static int rowCapacity() {
+    if(kind==1) return std::max(1,tabLayout.capacity);
     auto m = monitor.lock();
     return kind == 3 ? std::max(1,static_cast<int>(windows.size())) : (m ? std::max(1, std::min(9, static_cast<int>((m->m_size.x-64)/tabStep()))) : 1);
 }
@@ -182,6 +200,38 @@ static void capture() {
         previews[i]=snapshot(w);
         if (previews[i].fb) pixelsUsed+=cost;
     }
+}
+// Prepare switcher previews outside render passes, one window per IPC turn.
+// Generations invalidate work after closing, changing page, or opening overview.
+static int prepareTab(lua_State* L) {
+    const auto token=static_cast<uint64_t>(luaL_checkinteger(L,1));
+    if(!tabPreview() || closing || !tabPreparation.pending(token) || !contextValid() ||
+       g_pSessionLockManager->isSessionLocked()) return 0;
+    const int i=tabPreparation.take(token);
+    if(i<0 || i>=static_cast<int>(windows.size())) return 0;
+    const auto w=windows[i].lock();
+    if(w && w->m_isMapped && w->m_workspace) {
+        if(w->m_workspace->m_name=="special:floatland-minimized") {
+            for(const auto& entry:savedPreviews) if(entry.window.lock()==w) { previews[i]=entry.preview; break; }
+        } else if(auto m=w->m_monitor.lock()) {
+            const double cost=m->m_pixelSize.x*m->m_pixelSize.y;
+            if(tabPixels+cost<=previewBudget) {
+                previews[i]=snapshot(w);
+                if(previews[i].fb) tabPixels+=cost;
+            }
+        }
+    }
+    texture.reset(); damage();
+    if(tabPreparation.pending(token)) emit(std::format("prepare-tab,{}",token));
+    return 0;
+}
+static void beginTabPreviews() {
+    tabPreparation.cancel(); previews.clear(); previews.resize(windows.size());
+    if(!tabPreview()) return;
+    prunePreviews(); tabPixels=0;
+    for(const auto& entry:savedPreviews) tabPixels+=entry.pixels;
+    const auto token=tabPreparation.begin(first,std::min(static_cast<int>(windows.size()),first+rowCapacity()));
+    if(tabPreparation.pending(token)) emit(std::format("prepare-tab,{}",token));
 }
 // One snapshot per event-loop IPC turn. A cancelled generation cannot publish
 // an old scene, and repeated Win+G never builds duplicate scenes.
@@ -277,6 +327,8 @@ static int show(lua_State* L) {
         hide(); emit("cancel"); return 0;
     }
     if (m && m->m_activeWorkspace) workspaceId=m->m_activeWorkspace->m_id;
+    const auto previousWindows=windows;
+    const int previousFirst=first;
     windows.clear(); icons.clear();
     for (size_t i = 1; i <= lua_rawlen(L, 2); ++i) {
         lua_rawgeti(L, 2, i);
@@ -293,13 +345,20 @@ static int show(lua_State* L) {
     kind = next; closing=false;
     pending = kind == 1; overview = kind == 3;
     selected = windows.empty() ? 0 : std::clamp(index, 0, static_cast<int>(windows.size()) - 1);
-    first = std::max(0, selected - rowCapacity() + 1);
+    if(kind==1) layoutTabs();
+    else first = std::max(0, selected - rowCapacity() + 1);
     if (kind==3) {
         const auto token=flow.prepare(); overview=false;
         prunePreviews(); previews.clear(); previews.resize(windows.size()); cards.clear();
         prepareIndex=0; preparePixels=0;
         for (const auto& entry:savedPreviews) preparePixels+=entry.pixels;
         emit(std::format("prepare,{}",token));
+    } else if(kind==1) {
+        bool changed=previousWindows.size()!=windows.size();
+        if(!changed) for(size_t i=0;i<windows.size();++i)
+            if(previousWindows[i].lock()!=windows[i].lock()) { changed=true; break; }
+        if(opening || changed || previousFirst!=first) beginTabPreviews();
+        cards.clear();
     } else { capture(); arrange(); }
     pointerSelection=false; hoveredTask=-1; if (opening) transitionStart=std::chrono::steady_clock::now(); texture.reset(); textureKey.clear(); damage();
     if(kind==3) { const auto p=g_pInputManager->getMouseCoordsInternal(); pointerMove({p.x,p.y}); }
@@ -318,13 +377,19 @@ static int raiseWindow(lua_State* L) {
 static Floatland::Rect box() {
     auto m = monitor.lock();
     if (!m) return {};
-    if (kind == 3) return {m->m_position.x+24,m->m_position.y+24,std::max(1.0,m->m_size.x-48),std::max(1.0,m->m_size.y-48)};
+    if(kind==1) return tabLayout.panel;
+    if (kind == 3) {
+        const auto area=m->m_reservedArea.apply(CBox{m->m_position,m->m_size});
+        const double margin=std::min({24.0,area.w*.04,area.h*.04});
+        return {area.x+margin,area.y+margin,std::max(1.0,area.w-2*margin),std::max(1.0,area.h-2*margin)};
+    }
     const int count=std::max(1,std::min(static_cast<int>(windows.size()),rowCapacity()));
     const double width=std::min(m->m_size.x-16,24.0+tabStep()*count), height=tabHeight();
     return {m->m_position.x+(m->m_size.x-width)/2,m->m_position.y+(m->m_size.y-height)/2,width,height};
 }
 static Floatland::Rect tile(int i) {
     const auto b=box(); const int j=i-first;
+    if(kind==1) return j>=0 && j<static_cast<int>(tabLayout.cells.size())?tabLayout.cells[j]:Floatland::Rect{};
     if (kind != 3) return {b.x+12+j*tabStep(),b.y+12,tabStep()-4,tabHeight()-24};
     return i>=0 && i<static_cast<int>(cards.size())?cards[i]:Floatland::Rect{};
 }
@@ -336,7 +401,7 @@ static void arrange() {
         if(i<previews.size() && previews[i].fb) sizes.push_back({previews[i].source.w,previews[i].source.h});
         else sizes.push_back({r.w,r.h});
     }
-    cards=Floatland::overviewCards({b.x+16,b.y+40,b.w-32,b.h-56},sizes);
+    cards=Floatland::overviewCards({b.x+8,b.y+8,std::max(1.0,b.w-16),std::max(1.0,b.h-16)},sizes);
 }
 static bool isMinimized(int i) {
     auto w=windows[i].lock();
@@ -363,7 +428,7 @@ static PHLWINDOW at(Floatland::Point p) {
     const int i=indexAt(p); return i<0?nullptr:windows[i].lock();
 }
 static void pointerMove(Floatland::Point p) {
-    if(kind!=3 || !presenting() || closing || capturing || g_pSessionLockManager->isSessionLocked()) return;
+    if((kind!=3 && !(kind==1 && Floatland::Style::tab_mouse)) || !presenting() || closing || capturing || g_pSessionLockManager->isSessionLocked()) return;
     const bool changedMode=!pointerSelection;
     const int next=indexAt(p); pointerSelection=true;
     if(changedMode || next!=hoveredTask) { hoveredTask=next; if(next>=0) selected=next; texture.reset(); damage(); }
@@ -385,6 +450,7 @@ static bool button(IPointer::SButtonEvent e, Event::SCallbackInfo& info) {
         return true;
     }
     if (info.cancelled || g_pSessionLockManager->isSessionLocked() || g_pInputManager->isConstrained()) return false;
+    if(kind==1 && !Floatland::Style::tab_mouse) return false;
     const auto p=g_pInputManager->getMouseCoordsInternal();
     if (closing || (kind && presenting() && contextValid() && (overview || box().contains({p.x,p.y})))) {
         swallowedButtons.insert(e.button); info.cancelled=true;
@@ -398,7 +464,11 @@ static void key(IKeyboard::SKeyEvent e, Event::SCallbackInfo& info) {
         if (swallowed.erase(e.keycode)) info.cancelled = true;
         // Alt press was delivered to the client, so its release must pass through.
         if ((e.keycode == 56 || e.keycode == 100) && pending) {
-            pending = false; dismiss(); emit("commit");
+            pending = false;
+            if(kind==1 && pointerSelection && !closing && contextValid() && selected>=0 && selected<static_cast<int>(windows.size())) {
+                if(auto w=windows[selected].lock()) choose(w);
+                else { dismiss(); emit("cancel"); }
+            } else { dismiss(); emit("commit"); }
         }
         return;
     }
@@ -416,7 +486,12 @@ static void key(IKeyboard::SKeyEvent e, Event::SCallbackInfo& info) {
     std::string action;
     if (Floatland::Style::bindingsEnabled && Floatland::Style::switchingEnabled && e.keycode == static_cast<uint32_t>(Floatland::Style::altTabKey) && (mods & HL_MODIFIER_ALT) && !(mods & (HL_MODIFIER_CTRL | HL_MODIFIER_META))) {
         pending = true;
-        action = (mods & HL_MODIFIER_SHIFT) ? "previous" : "next";
+        if(kind==1 && pointerSelection && selected>=0 && selected<static_cast<int>(windows.size())) {
+            if(auto w=windows[selected].lock())
+                action=std::format("step,0x{:x},{},{}",reinterpret_cast<uintptr_t>(w.get()),w->getPID(),(mods & HL_MODIFIER_SHIFT)?1:0);
+        }
+        pointerSelection=false; hoveredTask=-1;
+        if(action.empty()) action = (mods & HL_MODIFIER_SHIFT) ? "previous" : "next";
     } else if (overviewKey) {
         pending = false; action = "overview";
     } else if (e.keycode == 1 && pending) {
@@ -503,8 +578,7 @@ class Pass : public IPassElement {
             }
             if (kind==3) {
                 cairo_set_source_rgb(cr,.9,.92,1);
-                text(cr,"Windows on this workspace · hover and pick · Esc to close",20,14,b.w-40);
-                if (windows.empty()) text(cr,"No windows on this workspace",20,64,b.w-40);
+                if (windows.empty()) text(cr,"No windows",20,20,b.w-40);
             }
             for (int i=first;i<std::min(static_cast<int>(windows.size()),first+rowCapacity());++i) {
                 auto t=tile(i); t.x-=b.x; t.y-=b.y;
@@ -514,10 +588,20 @@ class Pass : public IPassElement {
                     if (kind==3) { cairo_set_line_width(cr,2); cairo_stroke(cr); } else cairo_fill(cr);
                 }
                 auto w=windows[i].lock(); const bool minimized=w && w->m_workspace && w->m_workspace->m_name=="special:floatland-minimized";
-                const bool preview=kind==3 && i<static_cast<int>(previews.size()) && previews[i].fb;
-                if (!preview) { const double size=std::max(1.0,std::min({kind==3?80.0:static_cast<double>(Floatland::Style::iconSize),t.w-16,t.h-Floatland::Style::fontSize-12})); icon(cr,icons[i],t.x+(t.w-size)/2,t.y+(t.h-28-size)/2,size); }
+                const bool preview=(kind==3 || tabPreview()) && i<static_cast<int>(previews.size()) && previews[i].fb;
+                if(kind==1 && tabPreview()) {
+                    icon(cr,icons[i],t.x+6,t.y+4,18);
+                    cairo_set_source_rgb(cr,.95,.96,1);
+                    if(i==selected) text(cr,w?w->m_title:"Closed",t.x+30,t.y+4,t.w-36);
+                }
+                if (!preview) { const double size=std::max(1.0,std::min({kind==3?80.0:static_cast<double>(Floatland::Style::iconSize),t.w-16,t.h-((kind==1 && !tabLegacy())?16:Floatland::Style::fontSize+12)})); icon(cr,icons[i],t.x+(t.w-size)/2,t.y+(t.h-((kind==1 && !tabLegacy())?0:28)-size)/2,size); }
                 cairo_set_source_rgb(cr,.95,.96,1);
-                if(t.w>32 && t.h>48) text(cr,w?(minimized?"↓ ":"")+w->m_title:"Window closed",t.x+8,t.y+t.h-(kind==1?Floatland::Style::fontSize+8:25),t.w-16);
+                if(((kind==3 && i==selected && (!pointerSelection || hoveredTask==i)) || (kind!=3 && (kind!=1 || tabLegacy()))) && t.w>32 && t.h>48) text(cr,w?(minimized?"↓ ":"")+w->m_title:"Closed",t.x+8,t.y+t.h-(kind==1?Floatland::Style::fontSize+8:25),t.w-16);
+            }
+            if(kind==1 && !tabLegacy() && !windows.empty()) {
+                const auto w=windows[selected].lock();
+                cairo_set_source_rgb(cr,.95,.96,1);
+                text(cr,w?w->m_title:"Closed",16,b.h-Floatland::Style::fontSize-14,b.w-32);
             }
             cairo_surface_flush(surface); texture=g_pHyprRenderer->createTexture(surface);
             texture->m_imageDescription=NColorManagement::getDefaultImageDescription();
@@ -531,7 +615,7 @@ class Pass : public IPassElement {
         Render::GL::CHyprOpenGLImpl::STextureRenderData data{}; data.allowDim=false; data.a=phase;
         Render::GL::g_pHyprOpenGL->renderTexture(texture,CBox{px.x,px.y,px.w,px.h},data);
         std::vector<int> drawOrder;
-        if (kind==3) {
+        if (kind==3 || tabPreview()) {
             for (int i=first;i<std::min(static_cast<int>(windows.size()),first+rowCapacity());++i)
                 if (windows[i].lock()!=chosen.lock()) drawOrder.push_back(i);
             if (chosen.lock()) for (int i=0;i<static_cast<int>(windows.size());++i)
@@ -540,14 +624,14 @@ class Pass : public IPassElement {
         for (const int i:drawOrder) {
             if (i>=static_cast<int>(previews.size()) || !previews[i].fb || !windows[i].lock()) continue;
             const auto& p=previews[i];
-            const auto animated=visibleRect(i);
+            const auto animated=tabPreview()?Floatland::switcherPreview(tile(i),{p.source.w,p.source.h},Floatland::Style::fontSize):visibleRect(i);
             const auto d=Floatland::pixels(animated,{m->m_position.x,m->m_position.y},m->m_scale);
             if(i==selected && (!pointerSelection || hoveredTask==i)) {
                 Render::GL::CHyprOpenGLImpl::SRectRenderData frame{}; frame.round=static_cast<int>(10*m->m_scale);
                 const double border=2*m->m_scale;
                 Render::GL::g_pHyprOpenGL->renderRect(CBox{d.x-border,d.y-border,d.w+2*border,d.h+2*border},CHyprColor(.46,.65,1.,.9*phase),frame);
             }
-            data.a=isMinimized(i) && windows[i].lock()!=chosen.lock()?phase:1; data.allowCustomUV=true;
+            data.a=tabPreview()?phase:(isMinimized(i) && windows[i].lock()!=chosen.lock()?phase:1); data.allowCustomUV=true;
             data.primarySurfaceUVTopLeft={p.source.x/p.monitorSize.x,p.source.y/p.monitorSize.y};
             data.primarySurfaceUVBottomRight={(p.source.x+p.source.w)/p.monitorSize.x,(p.source.y+p.source.h)/p.monitorSize.y};
             Render::GL::g_pHyprOpenGL->renderTexture(p.fb->getTexture(),CBox{d.x,d.y,d.w,d.h},data);

@@ -3,11 +3,19 @@
 #include <vector>
 #include <limits>
 namespace Floatland {
-// Find the largest common scale that fits all windows. Row boundaries are
-// chosen by dynamic programming, not a fixed column count or paginated grid.
+// Balance visual area before packing: a maximized window must not dwarf its
+// neighbours. Preserve aspect ratios and never enlarge a source window.
+// Dynamic programming chooses row breaks; no fixed cells or pagination.
 inline std::vector<Rect> overviewCards(Rect area, const std::vector<Point>& sizes) {
     const size_t n=sizes.size();
     if (!n || area.w<=0 || area.h<=0) return {};
+    const double targetArea=area.w*area.h*.65/n;
+    std::vector<Point> balanced;
+    for(const auto& source:sizes) {
+        const double w=std::max(1.0,source.x),h=std::max(1.0,source.y);
+        const double factor=std::min(.78,std::sqrt(targetArea/(w*h)));
+        balanced.push_back({w*factor,h*factor});
+    }
     auto pack=[&](double scale,std::vector<size_t>* breaks) {
         std::vector<double> height(n+1,std::numeric_limits<double>::infinity());
         std::vector<size_t> previous(n+1); height[0]=0;
@@ -16,9 +24,9 @@ inline std::vector<Rect> overviewCards(Rect area, const std::vector<Point>& size
             double width=0,rowHeight=0;
             for(size_t begin=end;begin>0;) {
                 --begin;
-                width+=(std::max(1.0,sizes[begin].x)+24)*scale+(begin+1<end?gap:0);
+                width+=(std::max(1.0,balanced[begin].x)+24)*scale+(begin+1<end?gap:0);
                 if(width>area.w) break;
-                rowHeight=std::max(rowHeight,(std::max(1.0,sizes[begin].y)+48)*scale);
+                rowHeight=std::max(rowHeight,(std::max(1.0,balanced[begin].y)+48)*scale);
                 const double candidate=height[begin]+rowHeight+(begin?gap:0);
                 if(candidate<height[end]) { height[end]=candidate; previous[end]=begin; }
             }
@@ -29,7 +37,7 @@ inline std::vector<Rect> overviewCards(Rect area, const std::vector<Point>& size
         }
         return height[n];
     };
-    double low=0,high=.8;
+    double low=0,high=1.0;
     for(int step=0;step<40;++step) {
         const double mid=(low+high)/2;
         if(pack(mid,nullptr)<=area.h) low=mid; else high=mid;
@@ -41,12 +49,12 @@ inline std::vector<Rect> overviewCards(Rect area, const std::vector<Point>& size
     for(size_t end:ends) {
         double width=gap*(end-begin-1),rowHeight=0;
         for(size_t i=begin;i<end;++i) {
-            width+=(std::max(1.0,sizes[i].x)+24)*scale;
-            rowHeight=std::max(rowHeight,(std::max(1.0,sizes[i].y)+48)*scale);
+            width+=(std::max(1.0,balanced[i].x)+24)*scale;
+            rowHeight=std::max(rowHeight,(std::max(1.0,balanced[i].y)+48)*scale);
         }
         double x=area.x+(area.w-width)/2;
         for(size_t i=begin;i<end;++i) {
-            const double w=(std::max(1.0,sizes[i].x)+24)*scale,h=(std::max(1.0,sizes[i].y)+48)*scale;
+            const double w=(std::max(1.0,balanced[i].x)+24)*scale,h=(std::max(1.0,balanced[i].y)+48)*scale;
             result[i]={x,y+(rowHeight-h)/2,w,h}; x+=w+gap;
         }
         y+=rowHeight+gap; begin=end;

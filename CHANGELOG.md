@@ -1,6 +1,38 @@
 # Changelog
 
-Entries before 0.3.5 are listed at the bottom. Newest first.
+Newest first. Versions with an `e` suffix are experimental.
+
+## 0.6.5e — optional Qt CSD prototype
+
+- Mirrored titlebar button order when placed on the left; paint and hit testing share geometry.
+- Expanded .gitignore for logs, build products, crash reports and configuration backups.
+- Optional integrations/qt module and per-application launcher, with live appearance export.
+- Per-window CSD identifier and PID route button actions to the daemon, without focus guessing.
+- Native titlebar and its geometry reservation are skipped for tagged client decorations.
+- Prototype limitations and rollback documented; no Linux Qt build/runtime validation yet.
+- 205 Python/Lua tests and three standalone C++ test suites pass.
+
+## 0.6.3e — experimental overview
+
+- Stable ordering by application class, then by window area; focus history does not affect it.
+- Balanced visual preview area while keeping proportions, without enlarging the source windows.
+- Dynamic choice of rows, accounting for the monitor area reserved by panels.
+- Title only for the selected window; the instruction line is removed.
+- Snapshot preparation/release, OpenGL passes and the exit procedure were not reworked.
+- 201 Python/Lua tests and three standalone C++ suites pass on macOS.
+- A full build and visual check on Hyprland 0.56.2 are required.
+
+## 0.6.2e — experimental Alt+Tab
+
+- Memory of the normal floating size per application class in XDG_STATE_HOME, separate from session state.
+- 197 Python/Lua tests and three standalone C++ suites pass locally.
+- `icons` / `preview` and `legacy` styles via switching.lua.
+- Adaptive square icon cards, a label for the selected window and mouse control.
+- Preview keeps proportions, prepares one window at a time and cancels stale generations.
+- A repeated Tab does not re-create snapshots of the current page; the shared GPU snapshot budget is kept.
+- Tab after hovering continues from the window selected with the mouse; focus changes only on confirmation.
+- Geometry checked for 1–300 windows, different monitors, pages and extreme proportions.
+- A full build and Linux check have not been done yet. Overview was not reworked.
 
 ## 0.6.1.1
 

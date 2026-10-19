@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 DEFAULTS = {
-    "default_mode": "floating", "gap": 10, "width": .65, "height": .72,
+    "remember_sizes": True, "default_mode": "floating", "gap": 10, "width": .65, "height": .72,
     "cascade_step": 28, "exclude_classes": [], "workspace_modes": {}, "titlebar_height": 0,
     "titlebar_style": {}, "appearance": {},
 }
@@ -55,7 +55,10 @@ APPEARANCE = {'titlebar_color': '#1b2029',
  'button_hover_only': True,
  'snap_palette': True,
  'snap_edges': True,
- 'snap_preview': True}
+ 'snap_preview': True,
+ 'tab_style': 'icons',
+ 'tab_mouse': True,
+ 'tab_preview_width': 240}
 
 APPEARANCE_RULES = {'titlebar_color': ['color'],
  'titlebar_opacity': [0, 1],
@@ -101,7 +104,10 @@ APPEARANCE_RULES = {'titlebar_color': ['color'],
  'button_hover_only': ['bool'],
  'snap_palette': ['bool'],
  'snap_edges': ['bool'],
- 'snap_preview': ['bool']}
+ 'snap_preview': ['bool'],
+ 'tab_style': ['enum', 'icons', 'preview', 'legacy'],
+ 'tab_mouse': ['bool'],
+ 'tab_preview_width': [160, 360, 'int']}
 
 
 def validate_appearance(value):
@@ -149,6 +155,8 @@ def validate(value):
     config = dict(deepcopy(DEFAULTS), **value)
     if config["default_mode"] not in ("floating", "tiling"):
         raise ValueError("default_mode must be floating or tiling")
+    if type(config["remember_sizes"]) is not bool:
+        raise ValueError("remember_sizes must be boolean")
     for key in ("gap", "cascade_step", "titlebar_height"):
         if type(config[key]) is not int or not 0 <= config[key] <= 100:
             raise ValueError(key + " must be an integer from 0 to 100")

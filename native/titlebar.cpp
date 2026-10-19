@@ -51,7 +51,7 @@ FloatlandBar::~FloatlandBar() { m_lifetime.reset(); forgetBar(this); }
 
 bool FloatlandBar::visible() const {
     const auto w = owner();
-    return Style::titlebarsEnabled && w && w->m_isMapped && !w->isHidden() && w->m_isFloating && !w->m_pinned &&
+    return Style::titlebarsEnabled && w && w->m_class.find(".floatland-csd-")==std::string::npos && w->m_isMapped && !w->isHidden() && w->m_isFloating && !w->m_pinned &&
         !w->m_group && !w->m_X11DoesntWantBorders && w->m_workspace &&
         !w->m_workspace->m_isSpecialWorkspace && w->m_ruleApplicator->decorate().valueOrDefault() &&
         Fullscreen::controller()->getFullscreenModes(w).internal == Fullscreen::FSMODE_NONE;

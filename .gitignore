@@ -1,13 +1,43 @@
+# Python caches and local environments
 __pycache__/
 *.py[cod]
 *.egg-info/
-build/
-dist/
 .venv/
-
-# Floatland runtime
-logs/
-.DS_Store
-.idea/
-.vscode/
+venv/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# Build outputs (at any depth)
+build/
+build-*/
+cmake-build-*/
+dist/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+*.so
+*.so.*
+*.o
+*.a
+*.dSYM/
+# Logs, local state, crash dumps and migration backups
+logs/
+*.log
+*.sock
+*.pid
+core
+core.[0-9]*
+*crash-report.txt
+floatland-state.json
+window-sizes.json
+*.before-format
+*.before-format.*
+*.format-tmp
+# Editor and OS metadata
+.DS_Store
+._*
+*.swp
+*.swo
+*~

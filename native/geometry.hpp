@@ -62,7 +62,7 @@ inline Rect buttonRect(double width, Control control, bool left=false,
     int count=0,index=-1;
     for(auto entry:order) { if(entry==control) index=count; if(entry!=Control::None) ++count; }
     if(index<0) return {};
-    const double x=left ? PADDING+BUTTON*index : width-PADDING-BUTTON*(count-index);
+    const double x=left ? PADDING+BUTTON*(count-1-index) : width-PADDING-BUTTON*(count-index);
     // Keep a drag area on narrow windows; the outermost buttons have priority.
     return x>=0 && x+BUTTON<=width && (left ? x+BUTTON<=width-16 : x>=16)
         ? Rect{x,0,BUTTON,HEIGHT} : Rect{};

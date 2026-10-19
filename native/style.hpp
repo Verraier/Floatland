@@ -47,5 +47,8 @@ inline bool button_hover_only=true;
 inline bool snap_palette=true;
 inline bool snap_edges=true;
 inline bool snap_preview=true;
+inline std::string tab_style="icons";
+inline bool tab_mouse=true;
+inline int tab_preview_width=240;
 inline int revision=0;
 }

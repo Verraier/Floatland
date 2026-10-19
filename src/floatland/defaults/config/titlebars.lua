@@ -10,7 +10,7 @@ return {
     title_enabled = true,
     title_alignment = "left", -- "left", "center", "right". Buttons always reserve the outer edge.
     buttons_side = "right", -- "left" or "right".
-    -- Visual order from LEFT to RIGHT. Omit an action to hide its button; {} hides all.
+    -- Order from the window interior toward the outer edge; mirrored on the left. Omit an action to hide its button; {} hides all.
     buttons_order = { "maximize", "minimize", "close" },
     close_color = "#f55c57",
     minimize_color = "#fabe2e",

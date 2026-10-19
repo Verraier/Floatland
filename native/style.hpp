@@ -1,0 +1,51 @@
+#pragma once
+#include <array>
+#include <string>
+namespace Floatland::Style {
+inline std::array<double,3> titlebar{0.10588235294117647,0.12549019607843137,0.1607843137254902};
+inline double titlebarOpacity=1.0;
+inline std::array<double,3> snap{0.30196078431372547,0.6,1.0};
+inline double snapOpacity=0.18;
+inline std::array<double,3> tab{0.10980392156862745,0.12156862745098039,0.16862745098039217};
+inline double tabOpacity=0.93;
+inline int fontSize=14;
+inline int iconSize=80;
+inline std::array<double,3> titleText{0.9294117647058824,0.9490196078431372,1.0};
+inline int titleFontSize=10;
+inline std::array<double,3> closeColor{0.9607843137254902,0.3607843137254902,0.3411764705882353};
+inline std::array<double,3> minimizeColor{0.9803921568627451,0.7450980392156863,0.1803921568627451};
+inline std::array<double,3> maximizeColor{0.2,0.7686274509803922,0.34901960784313724};
+inline double buttonShift=.9;
+inline double buttonStretch=1.5;
+inline double buttonReturnDuration=.28;
+inline double buttonRebound=.12;
+inline bool buttonTexture=true;
+inline bool titlebarsEnabled=true;
+inline bool snapEnabled=true;
+inline double snapDuration=0.14;
+inline bool overviewEnabled=true;
+inline bool overviewBlur=true;
+inline std::array<double,3> overviewColor{0.03529411764705882,0.0392156862745098,0.058823529411764705};
+inline double overviewOpacity=0.22;
+inline double overviewEnterDuration=0.24;
+inline double overviewExitDuration=0.24;
+inline bool switchingEnabled=true;
+inline double tabEnterDuration=0.09;
+inline double tabExitDuration=0.07;
+inline bool bindingsEnabled=true;
+inline int altTabKey=15;
+inline int overviewKey=34;
+inline std::string buttons_side="right";
+inline std::string buttons_order="maximize,minimize,close";
+inline std::string title_alignment="left";
+inline bool title_enabled=true;
+inline double button_highlight=0.22;
+inline double button_growth=0.8;
+inline bool button_hinting=true;
+inline bool button_icons=true;
+inline bool button_hover_only=true;
+inline bool snap_palette=true;
+inline bool snap_edges=true;
+inline bool snap_preview=true;
+inline int revision=0;
+}

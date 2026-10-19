@@ -1,0 +1,261 @@
+--------------------------------------------
+   Hyprland Crash Report
+--------------------------------------------
+*thud*
+
+Hyprland received signal 6(ABRT)
+Version: efb50993780079460b0cbed1363e2166a2de1d9f
+Tag: v0.56.2
+Date: Wed Aug 5 14:13:21 2026
+Flags:
+
+Hyprland seems to be running with plugins. This crash might not be Hyprland's fault.
+Plugins:
+	floatland-bars (Floatland / Hypr Development) 0.5.4
+
+
+System info:
+	System name: Linux
+	Node name: cachylake
+	Release: 7.2.11-1-cachyos-polyacrylate
+	Version: #1 SMP PREEMPT_DYNAMIC Sat, 17 Oct 2026 14:55:58 +0000
+
+GPU:
+	03:00.0 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] Navi 48 [Radeon RX 9070/9070 XT/9070 GRE] [1002:7550] (rev c0) (prog-if 00 [VGA controller])
+11:00.0 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] Granite Ridge [Radeon 610M] [1002:13c0] (rev cb) (prog-if 00 [VGA controller])
+
+
+os-release:
+	NAME="CachyOS Linux"
+	PRETTY_NAME="CachyOS"
+	ID=cachyos
+	ID_LIKE=arch
+	BUILD_ID=rolling
+	ANSI_COLOR="38;2;23;147;209"
+	HOME_URL="https://cachyos.org/"
+	DOCUMENTATION_URL="https://wiki.cachyos.org/"
+	SUPPORT_URL="https://discuss.cachyos.org/"
+	BUG_REPORT_URL="https://github.com/cachyos"
+	PRIVACY_POLICY_URL="https://terms.archlinux.org/docs/privacy-policy/"
+	LOGO=cachyos
+
+Libraries:
+Hyprgraphics: built against 0.5.1, system has 0.5.1
+Hyprutils: built against 0.14.2, system has 0.14.2
+Hyprcursor: built against 0.1.13, system has 0.1.13
+Hyprlang: built against 0.6.8, system has 0.6.8
+Aquamarine: built against 0.15.1, system has 0.15.1
+
+Backtrace:
+	#0 | Hyprland(_Z12getBacktracev+0x7e) [0x55ea7b5f97fe]
+		getBacktrace()
+		??:?
+	#1 | Hyprland(_ZN13CrashReporter18createAndSaveCrashEi+0xbd1) [0x55ea7b518ed1]
+		CrashReporter::createAndSaveCrash(int)
+		??:?
+	#2 | Hyprland(+0x3d03a6) [0x55ea7b3eb3a6]
+		void std::println<>(_IO_FILE*, std::basic_format_string<char>)
+		??:?
+	#3 | /usr/lib/libc.so.6(+0x44cb0) [0x7f675b444cb0]
+		??
+		??:0
+	#4 | /usr/lib/libc.so.6(pthread_kill+0x13b) [0x7f675b4af22b]
+		??
+		??:0
+	#5 | /usr/lib/libc.so.6(gsignal+0x18) [0x7f675b444b88]
+		??
+		??:0
+	#6 | Hyprland(+0x25a081) [0x55ea7b275081]
+		void assertImpl<unsigned int&, int>(int, std::basic_string_view<char, std::char_traits<char> >, std::basic_format_string<char, std::type_identity<unsigned int&>::type, std::type_identity<int>::type>, unsigned int&, int&&)
+		??:?
+	#7 | Hyprland(_ZN6Render2GL15CHyprGLRenderer9endRenderERKSt8functionIFvvEE+0xf2) [0x55ea7ba05192]
+		Render::GL::CHyprGLRenderer::endRender(std::function<void ()> const&)
+		??:?
+	#8 | Hyprland(_ZN6Render13IHyprRenderer13renderMonitorEN9Hyprutils6Memory14CSharedPointerIN7Monitor8CMonitorEEEb+0x15e1) [0x55ea7ba67fc1]
+		Render::IHyprRenderer::renderMonitor(Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>, bool)
+		??:?
+	#9 | Hyprland(_ZN7Monitor22CMonitorFrameScheduler7onFrameEv+0x325) [0x55ea7b78f085]
+		Monitor::CMonitorFrameScheduler::onFrame()
+		??:?
+	#10 | /usr/lib/libhyprutils.so.13(_ZN9Hyprutils6Signal15CSignalListener12emitInternalEPv+0x29) [0x7f675d28ab69]
+		??
+		??:0
+	#11 | /usr/lib/libhyprutils.so.13(_ZN9Hyprutils6Signal11CSignalBase12emitInternalEPv+0x1b3) [0x7f675d28ade3]
+		??
+		??:0
+	#12 | /usr/lib/libhyprutils.so.13(_ZN9Hyprutils6Signal15CSignalListener12emitInternalEPv+0x29) [0x7f675d28ab69]
+		??
+		??:0
+	#13 | /usr/lib/libhyprutils.so.13(_ZN9Hyprutils6Signal11CSignalBase12emitInternalEPv+0x1b3) [0x7f675d28ade3]
+		??
+		??:0
+	#14 | /usr/lib/libaquamarine.so.14(+0xecc4a) [0x7f675d3e1c4a]
+		??
+		??:0
+	#15 | /usr/lib/libaquamarine.so.14(_ZN10Aquamarine8CBackend12dispatchIdleEv+0x210) [0x7f675d37e3b0]
+		??
+		??:0
+	#16 | Hyprland(+0x6c159a) [0x55ea7b6dc59a]
+		std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, unsigned int>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, unsigned int> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_M_insert_unique_node(unsigned long, unsigned long, std::__detail::_Hash_node<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, unsigned int>, true>*, unsigned long)
+		??:?
+	#17 | /usr/lib/libwayland-server.so.0(wl_event_loop_dispatch+0x292) [0x7f675d114702]
+		??
+		??:0
+	#18 | /usr/lib/libwayland-server.so.0(wl_display_run+0x27) [0x7f675d116d67]
+		??
+		??:0
+	#19 | Hyprland(_ZN17CEventLoopManager9enterLoopEv+0x2f2) [0x55ea7b6dfb22]
+		CEventLoopManager::enterLoop()
+		??:?
+	#20 | Hyprland(main+0x12a9) [0x55ea7b2b4229]
+		main
+		??:?
+	#21 | /usr/lib/libc.so.6(+0x27c8e) [0x7f675b427c8e]
+		??
+		??:0
+	#22 | /usr/lib/libc.so.6(__libc_start_main+0x8b) [0x7f675b427dcb]
+		??
+		??:0
+	#23 | Hyprland(_start+0x25) [0x55ea7b3d29b5]
+		_start
+		??:?
+
+
+Log tail:
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP → DEBOUNCE_EVENT_PRESS → DEBOUNCE_STATE_IS_DOWN_WAITING
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_DOWN_WAITING → DEBOUNCE_EVENT_TIMEOUT → DEBOUNCE_STATE_IS_DOWN
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 494
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_DOWN → DEBOUNCE_EVENT_RELEASE → DEBOUNCE_STATE_IS_UP_DETECTING_SPURIOUS
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP_DETECTING_SPURIOUS → DEBOUNCE_EVENT_TIMEOUT_SHORT → DEBOUNCE_STATE_IS_UP_WAITING
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP_WAITING → DEBOUNCE_EVENT_TIMEOUT → DEBOUNCE_STATE_IS_UP
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 494
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 494
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 494
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 494
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP → DEBOUNCE_EVENT_PRESS → DEBOUNCE_STATE_IS_DOWN_WAITING
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_DOWN_WAITING → DEBOUNCE_EVENT_TIMEOUT → DEBOUNCE_STATE_IS_DOWN
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 494
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_DOWN → DEBOUNCE_EVENT_RELEASE → DEBOUNCE_STATE_IS_UP_DETECTING_SPURIOUS
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP_DETECTING_SPURIOUS → DEBOUNCE_EVENT_TIMEOUT_SHORT → DEBOUNCE_STATE_IS_UP_WAITING
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP_WAITING → DEBOUNCE_EVENT_TIMEOUT → DEBOUNCE_STATE_IS_UP
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 494
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP → DEBOUNCE_EVENT_PRESS → DEBOUNCE_STATE_IS_DOWN_WAITING
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_DOWN_WAITING → DEBOUNCE_EVENT_TIMEOUT → DEBOUNCE_STATE_IS_DOWN
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_DOWN → DEBOUNCE_EVENT_RELEASE → DEBOUNCE_STATE_IS_UP_DETECTING_SPURIOUS
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 494
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP_DETECTING_SPURIOUS → DEBOUNCE_EVENT_TIMEOUT_SHORT → DEBOUNCE_STATE_IS_UP_WAITING
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 494
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP_WAITING → DEBOUNCE_EVENT_TIMEOUT → DEBOUNCE_STATE_IS_UP
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 494--------------------------------------------
+   Hyprland Crash Report
+--------------------------------------------
+Have you tried asking Hyprland politely not to crash?
+
+Hyprland received signal 11(SEGV)
+Version: efb50993780079460b0cbed1363e2166a2de1d9f
+Tag: v0.56.2
+Date: Wed Aug 5 14:13:21 2026
+Flags:
+
+Hyprland seems to be running with plugins. This crash might not be Hyprland's fault.
+Plugins:
+	floatland-bars (Floatland / Hypr Development) 0.5.8
+
+
+System info:
+	System name: Linux
+	Node name: cachylake
+	Release: 7.2.11-1-cachyos-polyacrylate
+	Version: #1 SMP PREEMPT_DYNAMIC Sat, 17 Oct 2026 14:55:58 +0000
+
+GPU:
+	03:00.0 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] Navi 48 [Radeon RX 9070/9070 XT/9070 GRE] [1002:7550] (rev c0) (prog-if 00 [VGA controller])
+11:00.0 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] Granite Ridge [Radeon 610M] [1002:13c0] (rev cb) (prog-if 00 [VGA controller])
+
+
+os-release:
+	NAME="CachyOS Linux"
+	PRETTY_NAME="CachyOS"
+	ID=cachyos
+	ID_LIKE=arch
+	BUILD_ID=rolling
+	ANSI_COLOR="38;2;23;147;209"
+	HOME_URL="https://cachyos.org/"
+	DOCUMENTATION_URL="https://wiki.cachyos.org/"
+	SUPPORT_URL="https://discuss.cachyos.org/"
+	BUG_REPORT_URL="https://github.com/cachyos"
+	PRIVACY_POLICY_URL="https://terms.archlinux.org/docs/privacy-policy/"
+	LOGO=cachyos
+
+Libraries:
+Hyprgraphics: built against 0.5.1, system has 0.5.1
+Hyprutils: built against 0.14.2, system has 0.14.2
+Hyprcursor: built against 0.1.13, system has 0.1.13
+Hyprlang: built against 0.6.8, system has 0.6.8
+Aquamarine: built against 0.15.1, system has 0.15.1
+
+Backtrace:
+	#0 | Hyprland(_Z12getBacktracev+0x7e) [0x55fea91b87fe]
+		getBacktrace()
+		??:?
+	#1 | Hyprland(_ZN13CrashReporter18createAndSaveCrashEi+0xbd1) [0x55fea90d7ed1]
+		CrashReporter::createAndSaveCrash(int)
+		??:?
+	#2 | Hyprland(+0x3d03a6) [0x55fea8faa3a6]
+		void std::println<>(_IO_FILE*, std::basic_format_string<char>)
+		??:?
+	#3 | /usr/lib/libc.so.6(+0x44cb0) [0x7fd332844cb0]
+		??
+		??:0
+	#4 | [0x7fd30c1adce6]
+		??
+		??:0
+
+
+Log tail:
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: [libinput] Plugin:mouse-wheel     - wheel: WHEEL_STATE_SCROLLING → WHEEL_EVENT_SCROLL_DIR_CHANGED → WHEEL_STATE_NONE
+DEBUG from aquamarine ]: [libinput] Plugin:mouse-wheel     - wheel: WHEEL_STATE_NONE → WHEEL_EVENT_SCROLL → WHEEL_STATE_SCROLLING
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 495
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 495
+DEBUG from aquamarine ]: [libinput] Plugin:mouse-wheel     - wheel: WHEEL_STATE_SCROLLING → WHEEL_EVENT_SCROLL_DIR_CHANGED → WHEEL_STATE_NONE
+DEBUG from aquamarine ]: [libinput] Plugin:mouse-wheel     - wheel: WHEEL_STATE_NONE → WHEEL_EVENT_SCROLL → WHEEL_STATE_SCROLLING
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 495
+DEBUG from aquamarine ]: [libinput] Plugin:mouse-wheel     - wheel: WHEEL_STATE_SCROLLING → WHEEL_EVENT_SCROLL_DIR_CHANGED → WHEEL_STATE_NONE
+DEBUG from aquamarine ]: [libinput] Plugin:mouse-wheel     - wheel: WHEEL_STATE_NONE → WHEEL_EVENT_SCROLL → WHEEL_STATE_SCROLLING
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 495
+DEBUG from aquamarine ]: [libinput] Plugin:mouse-wheel     - wheel: WHEEL_STATE_SCROLLING → WHEEL_EVENT_SCROLL_DIR_CHANGED → WHEEL_STATE_NONE
+DEBUG from aquamarine ]: [libinput] Plugin:mouse-wheel     - wheel: WHEEL_STATE_NONE → WHEEL_EVENT_SCROLL → WHEEL_STATE_SCROLLING
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: [libinput] Plugin:mouse-wheel     - wheel: WHEEL_STATE_SCROLLING → WHEEL_EVENT_SCROLL_DIR_CHANGED → WHEEL_STATE_NONE
+DEBUG from aquamarine ]: [libinput] Plugin:mouse-wheel     - wheel: WHEEL_STATE_NONE → WHEEL_EVENT_SCROLL → WHEEL_STATE_SCROLLING
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 495
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 487
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP → DEBOUNCE_EVENT_PRESS → DEBOUNCE_STATE_IS_DOWN_WAITING
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_DOWN_WAITING → DEBOUNCE_EVENT_TIMEOUT → DEBOUNCE_STATE_IS_DOWN
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_DOWN → DEBOUNCE_EVENT_RELEASE → DEBOUNCE_STATE_IS_UP_DETECTING_SPURIOUS
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP_DETECTING_SPURIOUS → DEBOUNCE_EVENT_TIMEOUT_SHORT → DEBOUNCE_STATE_IS_UP_WAITING
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP_WAITING → DEBOUNCE_EVENT_TIMEOUT → DEBOUNCE_STATE_IS_UP
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP → DEBOUNCE_EVENT_PRESS → DEBOUNCE_STATE_IS_DOWN_WAITING
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_DOWN_WAITING → DEBOUNCE_EVENT_TIMEOUT → DEBOUNCE_STATE_IS_DOWN
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_DOWN → DEBOUNCE_EVENT_RELEASE → DEBOUNCE_STATE_IS_UP_DETECTING_SPURIOUS
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP_DETECTING_SPURIOUS → DEBOUNCE_EVENT_TIMEOUT_SHORT → DEBOUNCE_STATE_IS_UP_WAITING
+DEBUG from aquamarine ]: [libinput] Plugin:button-debounce - debounce state: DEBOUNCE_STATE_IS_UP_WAITING → DEBOUNCE_EVENT_TIMEOUT → DEBOUNCE_STATE_IS_UP
+DEBUG from aquamarine ]: drm: Cursor buffer imported into KMS with id 495⏎                                                                
+~
+❯ 

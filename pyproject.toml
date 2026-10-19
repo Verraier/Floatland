@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "floatland"
+version = "0.6.1.1"
+description = "Shell-independent floating and native tiling controller for Hyprland"
+requires-python = ">=3.9"
+license = {text = "GPL-3.0-or-later"}
+readme = "README.md"
+dependencies = []
+
+[project.scripts]
+floatland = "floatland.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["floatland*"]
+
+[tool.setuptools.package-data]
+floatland = ["defaults/*.lua", "defaults/config/*.lua"]

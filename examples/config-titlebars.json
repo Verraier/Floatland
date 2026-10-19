@@ -1,0 +1,10 @@
+{
+  "default_mode": "floating",
+  "gap": 10,
+  "width": 0.65,
+  "height": 0.72,
+  "cascade_step": 28,
+  "workspace_modes": {},
+  "exclude_classes": [],
+  "titlebar_height": 32
+}

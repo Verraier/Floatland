@@ -4,11 +4,6 @@
 
 <h1 align="center">FloatLand</h1>
 
-<p align="center">
-  <strong>English</strong> · <a href="README.ru.md">Русский</a>
-</p>
-
-
 # FloatLand
 
 **English** · [Русский](README.ru.md)

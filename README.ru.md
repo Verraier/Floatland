@@ -1,3 +1,14 @@
+<p align="center">
+  <img src="examples/Floatland.svg" alt="Floatland Logo" width="200">
+</p>
+
+<h1 align="center">FloatLand</h1>
+
+<p align="center">
+  <strong>English</strong> · <a href="README.ru.md">Русский</a>
+</p>
+
+
 [English](README.md) · **Русский**
 
 # Floatland 0.6.1.1

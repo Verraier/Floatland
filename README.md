@@ -18,6 +18,8 @@ This is not a serious project — I made it for myself — but you may like it t
 - **Overview** — window overview of the current workspace (`Super+G`)
 - **Lua configuration** with live reload on save
 
+- **You can find preview videos in "examples" folder**
+
 ## Requirements
 
 - Python 3.9+

@@ -19,13 +19,16 @@ def identity(client):
 
 
 class Controller:
-    def __init__(self, ipc, state, config):
+    def __init__(self, ipc, state, config, size_memory=None):
         self.ipc, self.state, self.config = ipc, state, config
+        self.size_memory = size_memory
         self.windows = state.data["windows"]
         self.modes = state.data["modes"]
         self.clients, self.monitors = [], {}
         from .tasks import Tasks
         self.tasks = Tasks(self)
+        from .pip import PictureInPicture
+        self.pip = PictureInPicture(self)
         for record in self.windows.values():
             record.pop("drag_origin", None)  # Never resume a pointer grab after restart.
             record.pop("applied", None)  # Live compositor state may change while stopped.
@@ -44,9 +47,36 @@ class Controller:
             record.pop('applied', None)
         return {'reloaded': True}
 
+    def size_memory_allowed(self, client):
+        return (self.config.get("remember_sizes", True)
+                and (not client.get("xwayland", False) or self.config.get("remember_xwayland_sizes", False))
+                and not self.pip.active(client)
+                and not client.get("modal") and not client.get("transient")
+                and not client.get("override_redirect") and not client.get("nofocus"))
+
+    def remember_sizes(self, clients):
+        if self.size_memory is None or not self.config.get("remember_sizes", True):
+            return
+        for client in clients:
+            record = self.windows.get(client["address"])
+            if (not record or record["identity"] != identity(client) or not record.get("applied")
+                    or not self.eligible(client) or not self.size_memory_allowed(client) or not client.get("floating")
+                    or client.get("fullscreen") or client.get("fullscreenClient")
+                    or client.get("modal") or client.get("transient")
+                    or any(record.get(k) for k in ("zone", "minimized", "drag_origin"))):
+                continue
+            size = client.get("size")
+            if record.get("observed_size") != size:
+                self.size_memory.remember(client)
+                record["observed_size"] = list(size)
+
     def refresh(self):
+        self.remember_sizes(self.clients)
         self.clients = self.ipc.query("clients")
         self.monitors = {m["id"]: m for m in self.ipc.query("monitors")}
+        self.remember_sizes(self.clients)
+        if self.size_memory is not None:
+            self.size_memory.flush()
         live = {c["address"]: c for c in self.clients}
         for key in list(self.windows):
             if key not in live or self.windows[key]["identity"] != identity(live[key]):
@@ -55,6 +85,8 @@ class Controller:
     def eligible(self, client):
         return (client.get("mapped", True) and not client.get("hidden", False)
                 and not client.get("pinned", False)
+                and not client.get("override_redirect", False)
+                and not client.get("nofocus", False)
                 and client["workspace"]["id"] != -1
                 and not workspace(client).startswith("special:")
                 and workspace(client) != "special"
@@ -68,6 +100,13 @@ class Controller:
                 "original_geometry": geometry(client).values(),
                 "workspace": workspace(client),
             }
+            if client.get("xwayland") and not self.config.get("remember_xwayland_sizes", False):
+                logging.getLogger("floatland").debug("XWayland size restore skipped: class=%s address=%s size=%s",
+                    client.get("class", ""), key, client.get("size"))
+            if self.size_memory is not None and self.size_memory_allowed(client):
+                size = self.size_memory.get(client)
+                if size and not client.get("modal") and not client.get("transient"):
+                    self.windows[key]["remembered_size"] = list(size)
         return self.windows[key]
 
     def mode(self, name):
@@ -80,7 +119,7 @@ class Controller:
         return workarea(monitor, self.config["gap"])
 
     def bounds(self, client):
-        return content_rect(self.frame_bounds(client), self.config["titlebar_height"])
+        return content_rect(self.frame_bounds(client), 0 if ".floatland-csd-" in client.get("class", "") else self.config["titlebar_height"])
 
     def dispatch(self, client, command):
         self.ipc.dispatch(command, address(client["address"]))
@@ -104,12 +143,18 @@ class Controller:
         name = workspace(client)
         mode = self.mode(name)
         target_float = record.get("override", record["original_floating"] or mode == "floating")
-        if target_float and not client["floating"]:
+        remembered = record.get("remembered_size") if self.size_memory_allowed(client) else None
+        if target_float and (not client["floating"] or remembered):
             bounds = self.bounds(client)
             value = record.get("geometry")
             rect = Rect(*value) if value else cascade(
                 bounds, index, self.config["width"], self.config["height"], self.config["cascade_step"])
+            if remembered:
+                logging.getLogger("floatland").info("Restoring application size: class=%s address=%s size=%s",
+                    client.get("class", ""), client["address"], remembered)
+                rect = Rect(rect.x, rect.y, *remembered)
             self.place(client, rect)
+            record.pop("remembered_size", None)
         elif not target_float and client["floating"]:
             record["geometry"] = geometry(client).values()
             self.state.save()
@@ -131,6 +176,7 @@ class Controller:
             if record.get("applied") != desired:
                 self.apply(client, record, index)
             self.sync_restore(client, record)
+        self.pip.raise_all()
         self.state.save()
 
     def active(self, target=None, pid=None):
@@ -138,7 +184,7 @@ class Controller:
         client = next((c for c in self.clients if c["address"] == target), None)
         if client is not None and pid is not None and client.get("pid") != pid:
             raise ValueError("Titlebar target no longer belongs to the original process")
-        if client is None or not self.eligible(client):
+        if client is None or (not self.eligible(client) and not self.pip.active(client)):
             raise ValueError("No eligible active window (special, pinned and excluded windows are ignored)")
         if client.get("fullscreen", 0):
             raise ValueError("Exit fullscreen/maximized compositor mode before changing this window")
@@ -180,7 +226,7 @@ class Controller:
     def bars_event(self, payload):
         """Versioned native bridge; never fall back to the focused window."""
         version, action, target, process, value = payload.split(",")
-        if version != "1" or action not in ("close", "minimize", "maximize", "snap", "drag-start", "drag-restored", "drag-end"):
+        if version != "1" or action not in ("pip", "close", "minimize", "maximize", "snap", "drag-start", "drag-restored", "drag-end"):
             raise ValueError("Unsupported bars event")
         if not target or not process.isdecimal() or int(process) <= 0:
             raise ValueError("Bars event requires a window address and positive PID")
@@ -213,6 +259,27 @@ class Controller:
 
     def command(self, action, value=None, target=None, pid=None):
         self.refresh()
+        if action == "pip":
+            client = self.active(target, pid)
+            return {"window": client["address"], "pip": self.pip.toggle(client)}
+        if action in ("maximize", "minimize", "restore", "snap", "window-toggle", "pin"):
+            selected = target or self.ipc.query("activewindow").get("address")
+            client = next((w for w in self.clients if w["address"] == selected), None)
+            if client and self.pip.active(client):
+                client = self.active(selected, pid)
+                self.pip.restore(client)
+                if action in ("maximize", "restore", "pin"):
+                    return {"window": selected, "pip": False}
+        if action == "qt-action":
+            if (not isinstance(value, dict) or value.get("action") not in ("close", "minimize", "maximize")
+                    or not isinstance(value.get("class"), str) or ".floatland-csd-" not in value["class"]
+                    or type(value.get("pid")) is not int):
+                raise ValueError("Invalid Qt decoration action")
+            candidates = [w for w in self.clients if w.get("class") == value["class"] and w.get("pid") == value["pid"]]
+            if len(candidates) != 1:
+                raise ValueError("Qt decoration window is unavailable or ambiguous")
+            return self.command(value["action"], target=candidates[0]["address"], pid=value["pid"])
+
         if action == 'alt-tab':
             return self.tasks.next(value == 'reverse')
         if action == 'alt-tab-commit':
@@ -225,6 +292,7 @@ class Controller:
             return {"version": __version__, "bars_protocol": 1, "modes": self.modes, "default_mode": self.config["default_mode"],
                     "workspace_modes": self.config["workspace_modes"],
                     "managed_windows": len(self.windows),
+                    "pip": [k for k,r in self.windows.items() if r.get("pip")],
                     "minimized": [k for k, r in self.windows.items() if "minimized" in r]}
         if action in ("mode", "toggle"):
             name = self.active_workspace()
@@ -325,6 +393,8 @@ class Controller:
             record = self.windows.get(client["address"])
             if not record:
                 continue
+            if self.pip.active(client):
+                self.pip.restore(client)
             if "minimized" in record:
                 self.restore_minimized(client, record)
             if not self.eligible(client) or client.get("fullscreen", 0):

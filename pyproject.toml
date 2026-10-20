@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "floatland"
-version = "0.6.1.1"
+version = "0.6.7"
 description = "Shell-independent floating and native tiling controller for Hyprland"
 requires-python = ">=3.9"
 license = {text = "GPL-3.0-or-later"}

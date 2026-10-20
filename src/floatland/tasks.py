@@ -71,6 +71,18 @@ class Tasks:
         self.show(1, windows, self.index)
         return {'selected': windows[self.index]['address'], 'count': len(windows)}
 
+    def next_from(self, address, pid, reverse=False):
+        # Mouse selection never changes focus until the user commits it.
+        self.c.refresh()
+        window = next((w for w in self.candidates() if w['address']==address and w.get('pid')==pid), None)
+        if window is None or self.cycle_workspace != self.c.active_workspace():
+            return self.cancel()
+        key = self.key(window)
+        if key not in self.cycle:
+            return self.cancel()
+        self.index = self.cycle.index(key)
+        return self.next(reverse)
+
     def cancel(self):
         self.cycle = []
         self.cycle_workspace = None
@@ -134,6 +146,16 @@ class Tasks:
         current = self.c.active_workspace()
         windows = [w for w in self.ordered()
                    if w.get('pinned') or self.c.windows.get(w['address'], {}).get('minimized', {}).get('workspace', workspace(w)) == current]
+        # Stable application-name order; larger siblings precede smaller ones.
+        # Focus history must not rearrange the scene between invocations.
+        def overview_order(w):
+            record = self.c.windows.get(w['address'], {})
+            saved = record.get('minimized', {}).get('geometry')
+            size = saved[2:4] if saved else w.get('size', [1, 1])
+            name = w.get('initialClass') or w.get('class') or ''
+            return (name.casefold(), -size[0] * size[1],
+                    w.get('title', '').casefold(), w['address'])
+        windows.sort(key=overview_order)
         minimized = sum('minimized' in self.c.windows.get(w['address'], {}) for w in windows)
         self.show(3, windows)
         return {'overview': 'toggled', 'workspace': current, 'minimized': minimized}

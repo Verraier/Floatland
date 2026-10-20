@@ -33,6 +33,7 @@ def desktop_icons():
 def resolve(app_class):
     if not app_class:
         return ''
+    app_class = app_class.partition(".floatland-csd-")[0]
     name = desktop_icons().get(app_class.casefold(), app_class)
     absolute = Path(name)
     if absolute.is_absolute():

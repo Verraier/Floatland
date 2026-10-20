@@ -8,6 +8,8 @@
 #include "geometry.hpp"
 #include "button-motion.hpp"
 
+bool isPictureInPicture(PHLWINDOW window);
+
 class FloatlandBar : public IHyprWindowDecoration {
   public:
     explicit FloatlandBar(PHLWINDOW window);

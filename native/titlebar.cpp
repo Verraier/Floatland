@@ -51,7 +51,7 @@ FloatlandBar::~FloatlandBar() { m_lifetime.reset(); forgetBar(this); }
 
 bool FloatlandBar::visible() const {
     const auto w = owner();
-    return Style::titlebarsEnabled && w && w->m_isMapped && !w->isHidden() && w->m_isFloating && !w->m_pinned &&
+    return Style::titlebarsEnabled && w && w->m_class.find(".floatland-csd-")==std::string::npos && w->m_isMapped && !w->isHidden() && w->m_isFloating && (!w->m_pinned || isPictureInPicture(w)) &&
         !w->m_group && !w->m_X11DoesntWantBorders && w->m_workspace &&
         !w->m_workspace->m_isSpecialWorkspace && w->m_ruleApplicator->decorate().valueOrDefault() &&
         Fullscreen::controller()->getFullscreenModes(w).internal == Fullscreen::FSMODE_NONE;
@@ -96,7 +96,7 @@ void FloatlandBar::draw(PHLMONITOR monitor, const float& alpha) {
 }
 
 Control FloatlandBar::controlAt(Point point) const {
-    return Floatland::hitButtonCircle(globalBox(),point,Style::buttons_side=="left",buttonOrder(Style::buttons_order));
+    return Floatland::hitButtonCircle(globalBox(),point,Style::buttons_side=="left",buttonOrder(Style::buttons_order),Style::buttonSpacing,Style::buttonSize);
 }
 
 void FloatlandBar::releaseButton() {
@@ -126,10 +126,10 @@ void FloatlandBar::rasterize(int width, int height, bool focused) {
     // One layout defines both icon backgrounds and mouse targets.
     const auto order=buttonOrder(Style::buttons_order);
     const bool left=Style::buttons_side=="left";
-    const auto textBox=titleRect(box.w,left,order);
+    const auto textBox=titleRect(box.w,left,order,Style::buttonSpacing,Style::buttonSize);
     for (int i = 0; i < 3; ++i) {
         const auto control = static_cast<Control>(i);
-        const auto button = buttonRect(box.w, control,left,order);
+        const auto button = buttonRect(box.w, control,left,order,Style::buttonSpacing,Style::buttonSize);
         if (button.w == 0) continue;
         const std::array<double,3> colors[3] = {Style::closeColor,Style::minimizeColor,Style::maximizeColor};
         const auto& color = colors[i];
@@ -140,17 +140,20 @@ void FloatlandBar::rasterize(int width, int height, bool focused) {
         const double growth=held ? std::clamp(std::chrono::duration<double>(now-pressStarted).count()/.12,0.0,1.0) : m_returnGrowth*rebound;
         const Point pull=held ? (armed ? Point{} : pressOffset) : Point{m_returnOffset.x*rebound,m_returnOffset.y*rebound};
         const double strength=std::min(1.0,std::hypot(pull.x,pull.y))*Style::buttonStretch/1.05;
-        const double cx=button.x+button.w/2+Style::buttonShift*pull.x, cy=HEIGHT/2+Style::buttonShift*pull.y;
+        const double cx=button.x+button.w/2+4*Style::buttonShift*pull.x, cy=HEIGHT/2+4*Style::buttonShift*pull.y;
         const double saturation=focused?1.0:.28, opacity=focused?1.0:.65;
         const double highlight=armed?Style::button_highlight:0;
         auto brighten=[&](double value) { return value+(1-value)*highlight; };
         const double red=brighten(.38+(color[0]-.38)*saturation);
         const double green=brighten(.38+(color[1]-.38)*saturation);
         const double blue=brighten(.38+(color[2]-.38)*saturation);
-        const double radius=7+Style::button_growth*growth;
-        // The leading edge extends, the trailing edge almost stays put.
-        // This path affects only drawing; hit regions remain the original circles' cells.
-        const double front=radius+1.05*strength, back=radius-.10*strength, side=radius-.16*strength;
+        const double radius=Style::buttonSize/2+Style::button_growth*growth;
+        // Preserve approximate area while elongating along the pull direction.
+        // Hit regions remain the original circles even during deformation.
+        const auto shape=buttonDeformation(radius,std::min(1.0,std::hypot(pull.x,pull.y)),Style::buttonStretch);
+        const double travel=4*Style::buttonShift*std::hypot(pull.x,pull.y);
+        const double front=std::min(shape.front, std::max(radius,HEIGHT/2-1-travel));
+        const double back=shape.back, side=shape.across;
         const double k=.5522847498;
         cairo_save(cr); cairo_translate(cr,cx,cy);
         if(strength>0) cairo_rotate(cr,std::atan2(pull.y,pull.x));
@@ -180,7 +183,10 @@ void FloatlandBar::rasterize(int width, int height, bool focused) {
         const bool fit=Style::button_hinting && !held && rebound==0;
         const double ix=fit?hintedCenter(cx,scale,stroke):cx;
         const double iy=fit?hintedCenter(cy,height/box.h,stroke):cy;
-        cairo_save(cr); cairo_translate(cr,ix-cx,iy-cy);
+        cairo_save(cr); cairo_translate(cr,ix,iy);
+        const double angle=std::atan2(pull.y,pull.x);
+        cairo_rotate(cr,angle); cairo_scale(cr,shape.along/radius*Style::buttonSize/14,shape.across/radius*Style::buttonSize/14);
+        cairo_rotate(cr,-angle); cairo_translate(cr,-cx,-cy);
         cairo_set_line_width(cr,stroke/scale); cairo_set_line_cap(cr,CAIRO_LINE_CAP_ROUND);
         cairo_set_line_join(cr,CAIRO_LINE_JOIN_ROUND);
         if(control==Control::Close) {
@@ -202,7 +208,8 @@ void FloatlandBar::rasterize(int width, int height, bool focused) {
         auto font = pango_font_description_from_string("Sans");
         pango_font_description_set_size(font,Style::titleFontSize*PANGO_SCALE);
         pango_layout_set_font_description(layout, font);
-        pango_layout_set_text(layout, owner()->m_title.c_str(), -1);
+        const auto title = (isPictureInPicture(owner()) ? std::string("PiP · ") : std::string{}) + owner()->m_title;
+        pango_layout_set_text(layout, title.c_str(), -1);
         pango_layout_set_single_paragraph_mode(layout, true);
         pango_layout_set_width(layout, static_cast<int>(textBox.w*PANGO_SCALE));
         pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_END);
@@ -225,11 +232,11 @@ void FloatlandBar::rasterize(int width, int height, bool focused) {
 }
 void FloatlandBar::paint(PHLMONITOR monitor, float alpha) {
     if (!visible()) return;
-    const auto box = pixels(globalBox(), {monitor->m_position.x, monitor->m_position.y}, monitor->m_scale);
+    const auto box = titlebarPixels(globalBox(), {monitor->m_position.x, monitor->m_position.y}, monitor->m_scale);
     if (box.w < 1 || box.h < 1) return;
     const bool focused = Desktop::focusState()->window() == owner();
     const auto now = std::chrono::steady_clock::now();
-    const bool groupHover = hovered != Control::None || pressedControl != Control::None;
+    const bool groupHover = hovered != Control::None;
     if (groupHover != m_hoverTarget) {
         m_hoverFrom=m_hoverOpacity; m_hoverTarget=groupHover; m_hoverStart=now;
     }
@@ -244,7 +251,7 @@ void FloatlandBar::paint(PHLMONITOR monitor, float alpha) {
     const int pressFrame = pressedControl==Control::None ? 0 : static_cast<int>(std::clamp(std::chrono::duration<double>(std::chrono::steady_clock::now()-pressStarted).count()/.12,0.0,1.0)*12);
     const bool growing = pressedControl != Control::None && std::chrono::steady_clock::now()-pressStarted < std::chrono::milliseconds(120);
     if (growing) { m_key.clear(); damageEntire(); }
-    const auto key = std::format("{}:{}:{}:{}:{}:{}", box.w, box.h, focused, static_cast<int>(hovered), owner()->m_title, owner()->rounding()) + std::format(":{}:{}:{}:{}",static_cast<int>(pressedControl),pressOffset.x,pressOffset.y,pressFrame) + std::format(":{}",static_cast<int>(m_hoverOpacity*100)) + std::to_string(Style::revision);
+    const auto key = std::format("{}:{}:{}:{}:{}:{}", box.w, box.h, focused, static_cast<int>(hovered), owner()->m_title, owner()->rounding()) + std::format(":{}:{}:{}:{}",static_cast<int>(pressedControl),pressOffset.x,pressOffset.y,pressFrame) + std::format(":{}",static_cast<int>(m_hoverOpacity*100)) + std::to_string(Style::revision) + (isPictureInPicture(owner()) ? ":pip" : ":normal");
     if (!m_texture || key != m_key) {
         rasterize(static_cast<int>(box.w), static_cast<int>(box.h), focused);
         m_key = key;

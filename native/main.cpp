@@ -30,6 +30,10 @@
 #include "overview-filter.hpp"
 
 using namespace Floatland;
+static std::vector<PHLWINDOWREF> pipWindows;
+bool isPictureInPicture(PHLWINDOW window) {
+    return std::any_of(pipWindows.begin(),pipWindows.end(),[&](const auto& item) { return item.lock()==window; });
+}
 static HANDLE handle;
 static std::vector<FloatlandBar*> bars;
 static FloatlandBar* captured = nullptr;
@@ -62,6 +66,7 @@ static void clearSnap() {
     snapAlphaFrom=snapAlphaTo=0;
 }
 static void updateSnap(Point p, bool ownedRelease = false) {
+    if (captured && captured->owner() && captured->owner()->m_pinned) { clearSnap(); return; }
     if (!Style::snapEnabled) { clearSnap(); return; }
     if (!ownedRelease && !draggingOurWindow()) { clearSnap(); return; }
     auto m=State::monitorState()->query().vec(Vector2D{p.x,p.y}).run();
@@ -199,6 +204,8 @@ static int appearanceLua(lua_State* L) {
     std::array<double,3> next_closeColor; color("close_color",next_closeColor);
     std::array<double,3> next_minimizeColor; color("minimize_color",next_minimizeColor);
     std::array<double,3> next_maximizeColor; color("maximize_color",next_maximizeColor);
+    const auto next_buttonSize=number("button_size",8,20);
+    const auto next_buttonSpacing=number("button_spacing",0,40);
     const auto next_buttonShift=number("button_shift",0,2);
     const auto next_buttonStretch=number("button_stretch",0,2);
     const auto next_buttonReturnDuration=number("button_return_duration",0.05,0.5);
@@ -239,6 +246,12 @@ static int appearanceLua(lua_State* L) {
     const auto next_snap_edges=boolean("snap_edges");
     const auto next_snap_preview=boolean("snap_preview");
     if (!validButtonOrder(next_buttons_order)) return luaL_error(L,"invalid buttons_order");
+    const auto next_tab_style=textValue("tab_style");
+    if(next_tab_style!="icons" && next_tab_style!="preview" && next_tab_style!="legacy")
+        return luaL_error(L,"invalid tab_style");
+    const auto next_tab_mouse=boolean("tab_mouse");
+    const auto next_tab_preview_width=number("tab_preview_width",160,360);
+    if(std::floor(next_tab_preview_width)!=next_tab_preview_width) return luaL_error(L,"preview_width must be an integer");
     // Commit only after every field has passed validation.
     Style::titlebar=next_titlebar;
     Style::titlebarOpacity=next_titlebarOpacity;
@@ -273,6 +286,8 @@ static int appearanceLua(lua_State* L) {
     Style::bindingsEnabled=next_bindingsEnabled;
     Style::altTabKey=next_altTabKey;
     Style::overviewKey=next_overviewKey;
+    Style::buttonSize=next_buttonSize;
+    Style::buttonSpacing=next_buttonSpacing;
     Style::buttons_side=next_buttons_side;
     Style::buttons_order=next_buttons_order;
     Style::title_alignment=next_title_alignment;
@@ -289,6 +304,9 @@ static int appearanceLua(lua_State* L) {
     if (captured && click.pressed != Control::None) {
         captured->releaseButton(); captured=nullptr; click.active=false;
     }
+    Style::tab_style=next_tab_style;
+    Style::tab_mouse=next_tab_mouse;
+    Style::tab_preview_width=next_tab_preview_width;
     TaskUI::hide();
     TaskUI::flow.enterSeconds=Style::overviewEnterDuration;
     TaskUI::flow.exitSeconds=Style::overviewExitDuration;
@@ -414,6 +432,21 @@ static void restoreDuringDrag(Point pointer) {
 }
 static void mouseButton(IPointer::SButtonEvent e, Event::SCallbackInfo& info) {
     if (TaskUI::button(e, info)) return;
+    // Consume both sides of a right click before toggling PiP.
+    static bool pipRelease = false;
+    if (e.button == 273) {
+        if (e.state == WL_POINTER_BUTTON_STATE_RELEASED && pipRelease) {
+            pipRelease = false; info.cancelled = true; return;
+        }
+        if (e.state == WL_POINTER_BUTTON_STATE_PRESSED && !info.cancelled && !consumeRelease) {
+            const auto p = g_pInputManager->getMouseCoordsInternal();
+            if (auto* bar = hit({p.x,p.y})) {
+                dragEvent(bar->owner(), "pip");
+                pipRelease = true; info.cancelled = true;
+            }
+        }
+        return;
+    }
     if (e.button != 272) return;
     const auto cursor = g_pInputManager->getMouseCoordsInternal();
     const Point point{cursor.x, cursor.y};
@@ -425,7 +458,7 @@ static void mouseButton(IPointer::SButtonEvent e, Event::SCallbackInfo& info) {
         // plugin reload. Our swallowed press/motion still owns this release.
         const bool dragged = ownsSnapDrop(ownedDrag, bar && bar->visible(),
             movedDuringPress || click.moved(point), draggingOurWindow());
-        updateSnap(point, dragged);
+        updateSnap(point, dragged && bar && bar->owner() && !bar->owner()->m_pinned);
         const auto zone = selectedZone;
         const auto dropWindow = bar ? bar->owner() : nullptr;
         endDrag();
@@ -558,10 +591,19 @@ struct Listeners {
 };
 static UP<Listeners> listeners;
 
+static int pictureInPictureLua(lua_State* L) {
+    auto w=TaskUI::find(luaL_checkstring(L,1),luaL_checkinteger(L,2));
+    if (!w) return 0;
+    std::erase_if(pipWindows,[&](const auto& item) { return !item.lock() || item.lock()==w; });
+    if(lua_toboolean(L,3)) pipWindows.push_back(w);
+    resyncBars();
+    return 0;
+}
 APICALL EXPORT std::string PLUGIN_API_VERSION() { return HYPRLAND_API_VERSION; }
 APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     handle = h;
     TaskUI::reset();
+    pipWindows.clear();
     captured = nullptr;
     click = {};
     ownedDrag = consumeRelease = movedDuringPress = restoredDuringDrag = false;
@@ -570,12 +612,14 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     snapMonitor.reset();
     if (std::string(__hyprland_api_get_hash()) != std::string(__hyprland_api_get_client_hash()))
         throw std::runtime_error("Floatland titlebars: compositor/header ABI mismatch; rebuild for installed Hyprland");
-    if (!HyprlandAPI::addLuaFunction(handle, "floatland", "appearance", appearanceLua) ||
+    if (!HyprlandAPI::addLuaFunction(handle, "floatland", "pip", pictureInPictureLua) ||
+        !HyprlandAPI::addLuaFunction(handle, "floatland", "appearance", appearanceLua) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "geometry", geometryLua) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "restore_size", restoreSizeLua) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "refresh", refreshLua))
         throw std::runtime_error("Floatland: could not register geometry bridge");
     if (!HyprlandAPI::addLuaFunction(handle, "floatland", "tasks", TaskUI::show) ||
+        !HyprlandAPI::addLuaFunction(handle, "floatland", "prepare_tab", TaskUI::prepareTab) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "prepare_overview", TaskUI::prepareOverview) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "selection_valid", TaskUI::selectionValid) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "finish_selection", TaskUI::finishSelection) ||
@@ -586,7 +630,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     OverviewFilter::install(handle);
     try { listeners = makeUnique<Listeners>(); resyncBars(); }
     catch(...) { listeners.reset(); OverviewFilter::remove(handle); throw; }
-    return {"floatland-bars", "Native floating titlebars with shared render/input geometry", "Floatland / Hypr Development", "0.6.1.1"};
+    return {"floatland-bars", "Native floating titlebars with shared render/input geometry", "Floatland / Hypr Development", "0.6.7"};
 }
 APICALL EXPORT void PLUGIN_EXIT() {
     TaskUI::reset();

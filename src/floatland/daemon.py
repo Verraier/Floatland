@@ -8,6 +8,7 @@ import signal
 from .controller import Controller
 from .ipc import Hyprland, IPCError
 from .state import State
+from .size_memory import SizeMemory
 from .config_runtime import ConfigRuntime
 
 LOG = logging.getLogger("floatland")
@@ -30,7 +31,7 @@ async def run(directory, config, config_path=None, unified=False):
         raise
     path = directory / "floatland.sock"
     stop = asyncio.Event()
-    controller = Controller(ipc, State(directory / "floatland-state.json"), config)
+    controller = Controller(ipc, State(directory / "floatland-state.json"), config, SizeMemory())
     configuration = ConfigRuntime(controller, config_path, native=unified)
     LOG.info("Active configuration: %s | automatic reload=%s", configuration.path, unified)
     loop = asyncio.get_running_loop()
@@ -75,6 +76,9 @@ async def run(directory, config, config_path=None, unified=False):
                 reader, writer = await asyncio.open_unix_connection(str(directory / ".socket2.sock"))
                 # Subscribe first, then enumerate so windows opened during startup are not lost.
                 controller.reconcile()
+                for client in controller.clients:
+                    if controller.pip.active(client):
+                        ipc.set_pip(client, True)
                 ipc.resync_bars()
                 LOG.info("Startup sync: %d live windows, %d managed records", len(controller.clients), len(controller.windows))
                 if not announced:
@@ -93,10 +97,15 @@ async def run(directory, config, config_path=None, unified=False):
                     if event == 'activewindowv2':
                         controller.refresh()
                         controller.tasks.focused('0x' + payload.removeprefix('0x'))
+                        controller.pip.raise_all()
                     if event == 'floatland_tasks':
                         try:
                             parts = payload.split(',')
-                            if parts[0] == 'prepare' and len(parts) == 2:
+                            if parts[0] == 'prepare-tab' and len(parts) == 2:
+                                ipc.prepare_switcher(int(parts[1]))
+                            elif parts[0] == 'step' and len(parts) == 4:
+                                controller.tasks.next_from(parts[1], int(parts[2]), parts[3] == '1')
+                            elif parts[0] == 'prepare' and len(parts) == 2:
                                 ipc.prepare_overview(int(parts[1]))
                             elif parts[0] == 'choose' and len(parts) == 4:
                                 controller.tasks.choose(parts[1], int(parts[2]), int(parts[3]))
@@ -116,8 +125,6 @@ async def run(directory, config, config_path=None, unified=False):
                         except (ValueError, IPCError) as error:
                             LOG.warning("Bars action rejected: %s", error)
                         continue
-                    if event == "closewindow":
-                        controller.windows.pop("0x" + payload.removeprefix("0x"), None)
                     if event in EVENTS:
                         controller.reconcile()
             except (OSError, IPCError, ValueError, KeyError) as error:
@@ -143,6 +150,15 @@ async def run(directory, config, config_path=None, unified=False):
                     last_error = message
             await asyncio.sleep(.25)
 
+    async def size_watch():
+        while not stop.is_set():
+            await asyncio.sleep(1)
+            if controller.config.get("remember_sizes", True):
+                try:
+                    controller.refresh()
+                except (OSError, IPCError, ValueError) as error:
+                    LOG.warning("Size sampling failed: %s", error)
+
     def task_finished(task):
         if task.cancelled():
             return
@@ -155,11 +171,14 @@ async def run(directory, config, config_path=None, unified=False):
     task = None
     watcher = None
     config_watcher = None
+    size_watcher = None
     try:
         path.unlink(missing_ok=True)
         server = await asyncio.start_unix_server(control, str(path), limit=8192)
         os.chmod(path, 0o600)
         task = asyncio.create_task(events())
+        size_watcher = asyncio.create_task(size_watch())
+        size_watcher.add_done_callback(task_finished)
         watcher = asyncio.create_task(overview_watch())
         if unified:
             config_watcher = asyncio.create_task(configuration.watch(stop))
@@ -171,6 +190,11 @@ async def run(directory, config, config_path=None, unified=False):
             LOG.info("Running in foreground. Keep this terminal open; use a second terminal for commands.")
             await stop.wait()
     finally:
+        controller.remember_sizes(controller.clients)
+        controller.size_memory.flush()
+        if size_watcher:
+            size_watcher.cancel()
+            await asyncio.gather(size_watcher, return_exceptions=True)
         if config_watcher:
             config_watcher.cancel()
             await asyncio.gather(config_watcher, return_exceptions=True)

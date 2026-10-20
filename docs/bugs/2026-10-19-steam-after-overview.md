@@ -19,7 +19,7 @@ opened are not known yet.
 
 ## Attached data
 
-The [original crash report](2026-10-19-steam-crash-report.txt) contains two reports:
+The original crash report (not included in this repository) contained two reports:
 
 - floatland-bars 0.5.4: SIGABRT (6), `assertImpl` → `CHyprGLRenderer::endRender`.
 - floatland-bars 0.5.8: SIGSEGV (11), last frame #4 — address `0x7fd30c1adce6` with no function
@@ -43,7 +43,7 @@ the previous monitor/workspace remain. These are directions for investigation, n
 causes.
 
 No fix has been made for this case yet; 0.5.8 is not considered verified for this scenario.
-The original report is kept unchanged.
+The original report is not included in the repository.
 
 ## Audit 0.5.9
 

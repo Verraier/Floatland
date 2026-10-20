@@ -9,7 +9,7 @@ class AppearanceTests(unittest.TestCase):
         self.assertEqual(validate_appearance({'tab_icon_size':128,'tab_opacity':0})['tab_icon_size'],128)
         for key, value in [('snap_color','red'),('titlebar_opacity',float('nan')),
                            ('tab_opacity',1.1),('tab_font_size',True),('tab_font_size',25),
-                           ('tab_icon_size',31),('unknown',1)]:
+                           ('button_size',7),('button_size',21),('tab_icon_size',31),('unknown',1)]:
             with self.subTest(key=key), self.assertRaises(ValueError):
                 validate_appearance({key:value})
 

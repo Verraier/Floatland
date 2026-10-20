@@ -22,6 +22,40 @@ class TaskTests(unittest.TestCase):
         self.ipc.check_selection = Mock()
         self.ipc.finish_selection = Mock()
 
+    def test_overview_order_is_alphabetic_then_size_not_mru(self):
+        self.ipc.clients[0].update(initialClass='zebra', size=[700, 500])
+        self.ipc.clients[1].update(initialClass='Alpha', size=[600, 400])
+        self.ipc.clients[2].update(initialClass='alpha', size=[900, 700])
+        self.c.refresh()
+        self.c.tasks.focused('0x1')
+        self.c.tasks.overview()
+        order = [w['address'] for w in self.ipc.present_tasks.call_args.args[1]]
+        self.assertEqual(order, ['0x3', '0x2', '0x1'])
+        self.c.tasks.focused('0x2')
+        self.c.tasks.overview()
+        self.assertEqual([w['address'] for w in self.ipc.present_tasks.call_args.args[1]], order)
+        self.assertEqual(self.ipc.commands, [])
+
+    def test_overview_uses_minimized_saved_size_for_order(self):
+        self.c.command('minimize', target='0x2', pid=2)
+        self.c.windows['0x2']['minimized']['geometry'] = [0, 0, 1200, 900]
+        self.ipc.clients[1]['size'] = [1, 1]
+        self.c.tasks.overview()
+        self.assertEqual(self.ipc.present_tasks.call_args.args[1][0]['address'], '0x2')
+
+    def test_tab_after_mouse_hover_continues_from_hovered_window(self):
+        self.c.tasks.next()
+        self.assertEqual(self.ipc.focus,'0x1')
+        self.assertEqual(self.c.tasks.next_from('0x3',3)['selected'],'0x1')
+        self.assertEqual(self.ipc.focus,'0x1')
+        self.assertEqual(self.c.tasks.next_from('0x3',3,True)['selected'],'0x2')
+
+    def test_mouse_step_does_not_reuse_closed_or_other_workspace_window(self):
+        self.c.tasks.next()
+        self.ipc.clients.pop()
+        self.assertTrue(self.c.tasks.next_from('0x3',3)['cancelled'])
+        self.assertEqual(self.ipc.focus,'0x1')
+
     def test_disabled_interfaces_do_not_select_or_open(self):
         self.c.config['appearance'] = {'switching_enabled': False, 'overview_enabled': False}
         self.assertTrue(self.c.tasks.next()['disabled'])

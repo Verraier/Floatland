@@ -123,3 +123,9 @@ Details and third-party notices: [NOTICE.md](NOTICE.md), [native/NOTICE.md](nati
 
 GPL-3.0-or-later — see [LICENSE](LICENSE). Native code derived from Hyprbars keeps its
 BSD-3-Clause notice in [native/LICENSE.hyprbars](native/LICENSE.hyprbars).
+
+## Stable 0.6.7
+
+This release promotes the tested 0.6.7e behavior: window PiP mode, configurable button diameter, updated button motion, XWayland size-memory safeguards, and the accumulated switcher/overview improvements. Right-click a titlebar or run `python3 run.py pip` to toggle the current PiP mode. Add `button_size = 14,` (8..20 logical pixels) to `~/.config/floatland/config/titlebars.lua`.
+
+Qt client decorations remain an optional experiment. The replacement context menu and hover capsule are planned separately in [0.6.8e](docs/experiment-0.6.8e.md).

@@ -35,6 +35,8 @@ inline double tabExitDuration=0.07;
 inline bool bindingsEnabled=true;
 inline int altTabKey=15;
 inline int overviewKey=34;
+inline double buttonSize=14;
+inline double buttonSpacing=18;
 inline std::string buttons_side="right";
 inline std::string buttons_order="maximize,minimize,close";
 inline std::string title_alignment="left";
@@ -47,5 +49,8 @@ inline bool button_hover_only=true;
 inline bool snap_palette=true;
 inline bool snap_edges=true;
 inline bool snap_preview=true;
+inline std::string tab_style="icons";
+inline bool tab_mouse=true;
+inline int tab_preview_width=240;
 inline int revision=0;
 }

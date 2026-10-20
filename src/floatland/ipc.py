@@ -71,6 +71,9 @@ class Hyprland:
         self.evaluate('assert(hl.plugin.floatland.tasks, "Floatland native task UI not loaded"); '
                       'hl.plugin.floatland.tasks(' + str(kind) + ',{' + entries + '},' + str(selected) + ')', 'task switcher')
 
+    def prepare_switcher(self, generation):
+        self.evaluate("hl.plugin.floatland.prepare_tab(" + str(int(generation)) + ")", "prepare switcher")
+
     def prepare_overview(self, generation):
         self.evaluate('hl.plugin.floatland.prepare_overview(' + str(int(generation)) + ')', 'prepare overview')
 
@@ -87,6 +90,10 @@ class Hyprland:
                       'hl.plugin.floatland.remember_preview(' + lua_string(client['address']) + ',' +
                       str(int(client['pid'])) + ',' + ('true' if remember else 'false') + ') end',
                       'save minimized preview' if remember else 'forget minimized preview')
+
+    def set_pip(self, w, enabled):
+        self.evaluate('hl.plugin.floatland.pip(' + lua_string(w['address']) + ',' + str(int(w['pid']))
+                      + ',' + ('true' if enabled else 'false') + ')', 'configure PiP')
 
     def raise_window(self, w):
         self.evaluate('hl.plugin.floatland.raise_window(' + lua_string(w['address']) + ',' + str(int(w['pid'])) + ')', 'raise task')

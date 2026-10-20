@@ -25,6 +25,13 @@ class LuaConfigTests(unittest.TestCase):
     def write(self, section, text):
         (self.root/'config'/(section+'.lua')).write_text(text)
 
+    def test_button_diameter_roundtrip(self):
+        load(self.entry, create=True)
+        self.write('titlebars', 'return { button_size=18, button_spacing=4 }')
+        settings = load(self.entry)['appearance']
+        self.assertEqual(settings['button_size'],18)
+        self.assertEqual(settings['button_spacing'],4)
+
     def test_init_default_sections_and_theme_precedence(self):
         settings = load(self.entry, create=True)
         self.assertEqual(settings['appearance'], APPEARANCE)

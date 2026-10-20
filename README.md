@@ -33,7 +33,7 @@ This is not a serious project — I made it for myself — but you may like it t
 - Hyprland 0.56.2 headers
 - pixman, libdrm, libinput, libudev, wayland-server, xkbcommon, pangocairo, librsvg
 - A Lua interpreter (`lua`, `lua5.4`, `lua5.3` or `luajit`) — or the Python package `lupa`
-
+- Picture in Picture mode *RightMouseClick titlebar*
 ## Install & run
 
 ```sh

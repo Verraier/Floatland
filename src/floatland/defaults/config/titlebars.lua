@@ -9,6 +9,8 @@ return {
     font_size = 10, -- Integer 6..24. Title font size in points.
     title_enabled = true,
     title_alignment = "left", -- "left", "center", "right". Buttons always reserve the outer edge.
+    button_size = 14, -- Resting button diameter in logical pixels; 8..20. Symbols and hit targets scale together.
+    button_spacing = 18, -- Gap between resting circles, in logical px; 0..40.
     buttons_side = "right", -- "left" or "right".
     -- Order from the window interior toward the outer edge; mirrored on the left. Omit an action to hide its button; {} hides all.
     buttons_order = { "maximize", "minimize", "close" },
@@ -21,8 +23,8 @@ return {
     hinting = true, -- Fit idle symbol strokes to physical pixels for the monitor scale.
     highlight = 0.22, -- 0..0.6: blend toward white while held over the original button.
     growth = 0.8, -- 0..2: additional radius in logical px while held; 0 disables growth.
-    button_shift = 0.9, -- 0..2: maximum center movement in logical px; 0 disables movement.
-    button_stretch = 1.5, -- 0..2: leading-edge extension in logical px; 0 disables stretching.
+    button_shift = 0.9, -- 0..2: center movement multiplier (up to 4 px per unit); 0 disables movement.
+    button_stretch = 1.5, -- 0..2: directional deformation multiplier; 0 disables stretching.
     return_duration = 0.28, -- Seconds, 0.05..0.5, to settle after release.
-    rebound = 0.12, -- 0..0.15: fraction of held deformation for ONE opposite bounce; 0 disables it.
+    rebound = 0.12, -- 0..0.15: ONE opposite bounce (twice this fraction, capped at 0.3); 0 disables it.
 }

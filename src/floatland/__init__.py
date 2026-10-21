@@ -1,2 +1,2 @@
 """Floatland: a shell-independent Hyprland window policy."""
-__version__ = "0.6.5e"
+__version__ = "0.6.10e"

@@ -2,6 +2,8 @@
 return {
     -- Remember normal floating sizes by application class across closing and restarting.
     remember_sizes = true,
+    -- XWayland apps may share a class with menus and startup helper windows.
+    remember_xwayland_sizes = false,
     default_mode = "floating",
     gap = 10,
     width = 0.65,

@@ -7,6 +7,11 @@
 #include <hyprland/src/render/gl/GLTexture.hpp>
 #include "geometry.hpp"
 #include "button-motion.hpp"
+#include "mini-state.hpp"
+#include "mini-geometry.hpp"
+
+bool isPictureInPicture(PHLWINDOW window);
+bool isMiniMode(PHLWINDOW window);
 
 class FloatlandBar : public IHyprWindowDecoration {
   public:
@@ -16,13 +21,19 @@ class FloatlandBar : public IHyprWindowDecoration {
     void onPositioningReply(const SDecorationPositioningReply& reply) override;
     void draw(PHLMONITOR monitor, float const& alpha) override;
     eDecorationType getDecorationType() override { return DECORATION_CUSTOM; }
-    eDecorationLayer getDecorationLayer() override { return DECORATION_LAYER_UNDER; }
-    uint64_t getDecorationFlags() override { return DECORATION_ALLOWS_MOUSE_INPUT | DECORATION_PART_OF_MAIN_WINDOW; }
+    eDecorationLayer getDecorationLayer() override { return mini() ? DECORATION_LAYER_OVER : DECORATION_LAYER_UNDER; }
+    uint64_t getDecorationFlags() override { return mini() ? DECORATION_NON_SOLID : DECORATION_ALLOWS_MOUSE_INPUT | DECORATION_PART_OF_MAIN_WINDOW; }
     std::string getDisplayName() override { return "FloatlandTitlebar"; }
     void updateWindow(PHLWINDOW window) override;
     void damageEntire() override;
     std::weak_ptr<int> lifetime() const { return m_lifetime; }
     bool visible() const;
+    double miniProgress() const;
+    bool mini() const { return isMiniMode(owner()); }
+    Floatland::MiniState miniState;
+    bool pointerHit(Floatland::Point p, bool activation=false) const;
+    void tickMini(double now, bool over, bool held);
+
     PHLWINDOW owner() const { return m_window.lock(); }
     Floatland::Rect globalBox() const;
     void paint(PHLMONITOR monitor, float alpha);

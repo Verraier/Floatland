@@ -1,3 +1,11 @@
+> **0.6.10e experimental package:** GTK Floatland drawing/gestures and PID-isolated diagnostics; animated, configurable mini-titlebar; GTK diagnostics; Qt5 compositor fallback; installed AUR Equibop adapter. See [instructions](integrations/README.md) and [mini-mode settings](docs/experiment-0.6.9e.md). Linux runtime validation is pending.
+
+<p align="center">
+  <img src="examples/Floatland.svg" alt="Floatland Logo" width="200">
+</p>
+
+<h1 align="center">FloatLand</h1>
+
 # FloatLand
 
 **English** · [Русский](README.ru.md)
@@ -8,18 +16,17 @@ Floating window management for [Hyprland](https://hyprland.org/) with quality-of
 This is not a serious project — I made it for myself — but you may like it too.
 
 **Target:** Hyprland **0.56.2** (headers of the exact installed version are required to build).
-**Current version:** 0.6.5e — experimental. The last version without the `e` suffix is 0.6.1.1.
 
 ## Features
 
 - **Floating / tiling toggle** with remembered window geometry
-- **Remembered sizes** — the last normal floating size of each application is restored
-- **Title bars** — native, configurable buttons (close / minimize / maximize): side, order, colors, animations
+- **Title bars** — native, configurable buttons (close / minimize / maximize), animations
 - **Snapping** — drag a title bar to a screen edge or the top palette
-- **Alt+Tab** window switcher with three styles: `icons`, `preview` (thumbnails) and `legacy`; mouse support
-- **Overview** — windows of the current workspace, grouped by application (`Super+G`)
+- **Alt+Tab** window switcher with icons
+- **Overview** — window overview of the current workspace (`Super+G`)
 - **Lua configuration** with live reload on save
-- **Optional, experimental:** Qt client-side titlebar prototype ([integrations/qt](integrations/qt/README.md))
+
+- **You can find preview videos in "examples" folder**
 
 ## Requirements
 
@@ -28,7 +35,7 @@ This is not a serious project — I made it for myself — but you may like it t
 - Hyprland 0.56.2 headers
 - pixman, libdrm, libinput, libudev, wayland-server, xkbcommon, pangocairo, librsvg
 - A Lua interpreter (`lua`, `lua5.4`, `lua5.3` or `luajit`) — or the Python package `lupa`
-
+- Picture in Picture mode *RightMouseClick titlebar*
 ## Install & run
 
 ```sh
@@ -45,8 +52,7 @@ Your Hyprland config is **not** modified automatically. To wire it up manually, 
 
 ## Configuration
 
-On first run, a config is created in `~/.config/floatland/` (respects `$XDG_CONFIG_HOME`).
-Edit these files, not the templates inside the source tree.
+On first run, a config is created in `~/.config/floatland/` (respects `$XDG_CONFIG_HOME`):
 
 ```text
 ~/.config/floatland/
@@ -66,15 +72,7 @@ python3 run.py config init        # create the config without starting Hyprland
 python3 run.py config path        # print the path to init.lua
 python3 run.py config show        # validate and show effective values
 python3 run.py config reference   # documented list of all options
-python3 run.py config format      # turn old generated Lua into commented templates
 python3 run.py reload             # apply manually (auto-reload also happens on save)
-```
-
-Example, in `config/switching.lua`:
-
-```lua
-style = "icons",    -- "icons", "preview" or "legacy"
-mouse = true,       -- hover selects; release Alt or click to activate
 ```
 
 Full reference: [docs/configuration.md](docs/configuration.md).
@@ -83,23 +81,11 @@ Full reference: [docs/configuration.md](docs/configuration.md).
 
 | Key / action | What it does |
 |---|---|
-| `Alt+Tab` | Switch windows (release Alt to select, `Esc` to cancel; `Tab` pages through many windows) |
-| `Super+G` | Overview of the current workspace (click / `Enter` select, arrows / wheel move, `Esc` or `Super+G` close) |
+| `Alt+Tab` | Switch windows (release Alt to select, `Esc` to cancel) |
+| `Super+G` | Overview of the current workspace |
 | Drag title bar to edge / palette | Snap |
 | `python3 run.py toggle` | Floating ⇄ tiling |
 | `python3 run.py snap left`, `maximize`, `restore`, `center`, `minimize`, `pin` | Window commands |
-
-## Qt titlebar prototype (experimental)
-
-An optional module draws the titlebar inside a Qt 6 application's own window.
-It is a first prototype: it needs Qt 6.8+ with private headers, was **not built or tested on Linux**,
-and snap gestures are not connected yet. It does not affect normal Floatland.
-
-```sh
-python3 run.py qt -- your-qt6-application
-```
-
-Details, limits and rollback: [integrations/qt/README.md](integrations/qt/README.md).
 
 ## Development
 
@@ -107,15 +93,13 @@ Details, limits and rollback: [integrations/qt/README.md](integrations/qt/README
 python3 tools/check.py   # Python/Lua tests + standalone C++ tests
 ```
 
-Layout: `src/floatland/` (Python), `native/` (C++ plugin), `integrations/` (optional), `tests/`, `docs/`, `examples/`.
+Layout: `src/floatland/` (Python), `native/` (C++ plugin), `tests/`, `docs/`, `examples/`.
 See [docs/architecture.md](docs/architecture.md).
 
 ## Status
 
-The logic is tested on macOS; the full plugin needs more testing on real Hyprland.
-Expect rough edges. Known: `Alt+Shift+Tab` (switching backwards) does **not** work yet;
-a Hyprland crash after overview → another workspace → Steam is still unexplained
-([docs/bugs](docs/bugs/2026-10-19-steam-after-overview.md)). See [CHANGELOG.md](CHANGELOG.md).
+Tested logic-wise on macOS; the full plugin needs more testing on real Hyprland.
+Expect rough edges. Known: `Alt+Shift+Tab` (switching backwards) does **not** work yet. See [CHANGELOG.md](CHANGELOG.md) and [docs/bugs/](docs/bugs/) for known issues.
 
 ## Credits
 
@@ -132,8 +116,6 @@ Big thank you — without these projects this wouldn't have happened:
 - **[Hyprtasking](https://github.com/raybbian/hyprtasking)** by Raymond Bian and contributors (BSD-3-Clause) —
   overview API and input behaviour were checked against it; the optional legacy integration in
   `src/floatland/overview.py` uses it via hyprpm.
-- **[Qt](https://www.qt.io/)** — the optional Qt prototype uses the user's own Qt 6 (private qtwayland
-  decoration interfaces); no Qt source is included.
 - Libraries used at build/run time: Pango, Cairo, librsvg, pixman, libdrm, libinput, xkbcommon,
   wayland, and Lua / [lupa](https://github.com/scoder/lupa) for configuration.
 
@@ -143,3 +125,9 @@ Details and third-party notices: [NOTICE.md](NOTICE.md), [native/NOTICE.md](nati
 
 GPL-3.0-or-later — see [LICENSE](LICENSE). Native code derived from Hyprbars keeps its
 BSD-3-Clause notice in [native/LICENSE.hyprbars](native/LICENSE.hyprbars).
+
+## Stable 0.6.7
+
+This release promotes the tested 0.6.7e behavior: window PiP mode, configurable button diameter, updated button motion, XWayland size-memory safeguards, and the accumulated switcher/overview improvements. Right-click a titlebar or run `python3 run.py pip` to toggle the current PiP mode. Add `button_size = 14,` (8..20 logical pixels) to `~/.config/floatland/config/titlebars.lua`.
+
+Qt client decorations remain an optional experiment. The replacement context menu and hover capsule are planned separately in [0.6.8e](docs/experiment-0.6.8e.md).

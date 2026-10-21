@@ -27,6 +27,12 @@ inline Rect pixels(Rect global, Point monitor, double scale) {
     return {left, top, std::round((global.x + global.w - monitor.x) * scale) - left,
             std::round((global.y + global.h - monitor.y) * scale) - top};
 }
+// Raster dimensions depend on size and scale only, never on screen position.
+inline Rect titlebarPixels(Rect global, Point monitor, double scale) {
+    const double height=std::max(1.0,std::round(global.h*scale));
+    return {std::round((global.x-monitor.x)*scale), std::round((global.y+global.h-monitor.y)*scale)-height,
+            std::max(1.0,std::round(global.w*scale)), height};
+}
 using ButtonOrder = std::array<Control,3>;
 inline bool validButtonOrder(const std::string& order) {
     if (order.empty()) return true;
@@ -57,42 +63,43 @@ inline ButtonOrder buttonOrder(const std::string& value) {
     return order;
 }
 inline Rect buttonRect(double width, Control control, bool left=false,
-                       ButtonOrder order={Control::Maximize,Control::Minimize,Control::Close}) {
+                       ButtonOrder order={Control::Maximize,Control::Minimize,Control::Close}, double spacing=18, double diameter=14) {
     if(control==Control::None) return {};
     int count=0,index=-1;
     for(auto entry:order) { if(entry==control) index=count; if(entry!=Control::None) ++count; }
     if(index<0) return {};
-    const double x=left ? PADDING+BUTTON*(count-1-index) : width-PADDING-BUTTON*(count-index);
+    const double step=diameter+std::clamp(spacing,0.0,40.0);
+    const double x=left ? PADDING+step*(count-1-index) : width-PADDING-BUTTON-step*(count-1-index);
     // Keep a drag area on narrow windows; the outermost buttons have priority.
     return x>=0 && x+BUTTON<=width && (left ? x+BUTTON<=width-16 : x>=16)
         ? Rect{x,0,BUTTON,HEIGHT} : Rect{};
 }
 inline Control hit(Rect bar, Point global, bool left=false,
-                   ButtonOrder order={Control::Maximize,Control::Minimize,Control::Close}) {
+                   ButtonOrder order={Control::Maximize,Control::Minimize,Control::Close}, double spacing=18, double diameter=14) {
     if (!bar.contains(global)) return Control::None;
     for (int i=0;i<3;++i)
-        if(buttonRect(bar.w,static_cast<Control>(i),left,order).contains({global.x-bar.x,global.y-bar.y}))
+        if(buttonRect(bar.w,static_cast<Control>(i),left,order,spacing,diameter).contains({global.x-bar.x,global.y-bar.y}))
             return static_cast<Control>(i);
     return Control::None;
 }
 // Interaction follows the visible resting circle, not its larger layout cell.
 // Keep this radius stable during stretching to prevent hover feedback loops.
 inline Control hitButtonCircle(Rect bar, Point global, bool left=false,
-                               ButtonOrder order={Control::Maximize,Control::Minimize,Control::Close}) {
+                               ButtonOrder order={Control::Maximize,Control::Minimize,Control::Close}, double spacing=18, double diameter=14) {
     if (!bar.contains(global)) return Control::None;
     for(auto control:order) {
-        const auto cell=buttonRect(bar.w,control,left,order);
+        const auto cell=buttonRect(bar.w,control,left,order,spacing,diameter);
         if(cell.w==0) continue;
         const double dx=global.x-bar.x-cell.x-cell.w/2;
         const double dy=global.y-bar.y-HEIGHT/2;
-        if(dx*dx+dy*dy<=49) return control;
+        if(dx*dx+dy*dy<=diameter*diameter/4) return control;
     }
     return Control::None;
 }
-inline Rect titleRect(double width, bool left, ButtonOrder order) {
+inline Rect titleRect(double width, bool left, ButtonOrder order, double spacing=18, double diameter=14) {
     double begin=12,end=width-12;
     for(auto control:order) {
-        const auto button=buttonRect(width,control,left,order);
+        const auto button=buttonRect(width,control,left,order,spacing,diameter);
         if(button.w==0) continue;
         if(left) begin=std::max(begin,button.x+button.w+8);
         else end=std::min(end,button.x-8);

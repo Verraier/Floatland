@@ -15,7 +15,7 @@ compiler=shutil.which('c++')
 if not compiler:
     raise SystemExit('Python tests passed; C++ compiler unavailable, native logic tests NOT run.')
 with tempfile.TemporaryDirectory() as temporary:
-    for name in ('geometry_test','overview_flow_test','switcher_layout_test'):
+    for name in ('geometry_test','overview_flow_test','switcher_layout_test','mini-state-test'):
         output=Path(temporary)/name
         subprocess.run([compiler,'-std=c++17','-Wall','-Wextra','-Werror',str(root/'native'/(name+'.cpp')),'-o',str(output)],check=True)
         subprocess.run([str(output)],check=True)

@@ -30,6 +30,15 @@
 #include "overview-filter.hpp"
 
 using namespace Floatland;
+static std::vector<PHLWINDOWREF> pipWindows;
+bool isPictureInPicture(PHLWINDOW window) {
+    return std::any_of(pipWindows.begin(),pipWindows.end(),[&](const auto& item) { return item.lock()==window; });
+}
+static std::vector<PHLWINDOWREF> miniWindows;
+bool isMiniMode(PHLWINDOW window) {
+    return std::any_of(miniWindows.begin(),miniWindows.end(),[&](const auto& item) { return item.lock()==window; });
+}
+#include "window-menu.hpp"
 static HANDLE handle;
 static std::vector<FloatlandBar*> bars;
 static FloatlandBar* captured = nullptr;
@@ -62,6 +71,7 @@ static void clearSnap() {
     snapAlphaFrom=snapAlphaTo=0;
 }
 static void updateSnap(Point p, bool ownedRelease = false) {
+    if (captured && (captured->mini() || (captured->owner() && captured->owner()->m_pinned))) { clearSnap(); return; }
     if (!Style::snapEnabled) { clearSnap(); return; }
     if (!ownedRelease && !draggingOurWindow()) { clearSnap(); return; }
     auto m=State::monitorState()->query().vec(Vector2D{p.x,p.y}).run();
@@ -183,6 +193,18 @@ static int appearanceLua(lua_State* L) {
         if (!std::isfinite(v) || v<low || v>high) luaL_error(L,"invalid appearance number: %s",key);
         return v;
     };
+    std::array<double,3> next_miniColor; color("mini_color",next_miniColor);
+    const auto next_miniOpacity=number("mini_opacity",0,1);
+    std::array<double,3> next_miniBorderColor; color("mini_border_color",next_miniBorderColor);
+    const auto next_miniBorderOpacity=number("mini_border_opacity",0,1);
+    const auto next_miniBorderWidth=number("mini_border_width",0,4);
+    const auto next_miniWidth=number("mini_width",96,320);
+    const auto next_miniHeight=number("mini_height",28,64);
+    const auto next_miniButtonSize=number("mini_button_size",8,24);
+    const auto next_miniButtonSpacing=number("mini_button_spacing",0,40);
+    const auto next_miniOffset=number("mini_offset",0,32);
+    const auto next_miniDuration=number("mini_duration",0.035,0.5);
+    const auto next_miniTimeout=number("mini_timeout",0.5,30);
     std::array<double,3> next_titlebar; color("titlebar_color",next_titlebar);
     const auto next_titlebarOpacity=number("titlebar_opacity",0,1);
     std::array<double,3> next_snap; color("snap_color",next_snap);
@@ -199,6 +221,8 @@ static int appearanceLua(lua_State* L) {
     std::array<double,3> next_closeColor; color("close_color",next_closeColor);
     std::array<double,3> next_minimizeColor; color("minimize_color",next_minimizeColor);
     std::array<double,3> next_maximizeColor; color("maximize_color",next_maximizeColor);
+    const auto next_buttonSize=number("button_size",8,20);
+    const auto next_buttonSpacing=number("button_spacing",0,40);
     const auto next_buttonShift=number("button_shift",0,2);
     const auto next_buttonStretch=number("button_stretch",0,2);
     const auto next_buttonReturnDuration=number("button_return_duration",0.05,0.5);
@@ -246,6 +270,18 @@ static int appearanceLua(lua_State* L) {
     const auto next_tab_preview_width=number("tab_preview_width",160,360);
     if(std::floor(next_tab_preview_width)!=next_tab_preview_width) return luaL_error(L,"preview_width must be an integer");
     // Commit only after every field has passed validation.
+    Style::miniColor=next_miniColor;
+    Style::miniOpacity=next_miniOpacity;
+    Style::miniBorderColor=next_miniBorderColor;
+    Style::miniBorderOpacity=next_miniBorderOpacity;
+    Style::miniBorderWidth=next_miniBorderWidth;
+    Style::miniWidth=next_miniWidth;
+    Style::miniHeight=next_miniHeight;
+    Style::miniButtonSize=next_miniButtonSize;
+    Style::miniButtonSpacing=next_miniButtonSpacing;
+    Style::miniOffset=next_miniOffset;
+    Style::miniDuration=next_miniDuration;
+    Style::miniTimeout=next_miniTimeout;
     Style::titlebar=next_titlebar;
     Style::titlebarOpacity=next_titlebarOpacity;
     Style::snap=next_snap;
@@ -279,6 +315,8 @@ static int appearanceLua(lua_State* L) {
     Style::bindingsEnabled=next_bindingsEnabled;
     Style::altTabKey=next_altTabKey;
     Style::overviewKey=next_overviewKey;
+    Style::buttonSize=next_buttonSize;
+    Style::buttonSpacing=next_buttonSpacing;
     Style::buttons_side=next_buttons_side;
     Style::buttons_order=next_buttons_order;
     Style::title_alignment=next_title_alignment;
@@ -316,7 +354,7 @@ static void refresh(PHLWINDOW w) {
     for (auto* bar : bars) if (bar->owner() == w) bar->updateWindow(w);
     g_pDecorationPositioner->onWindowUpdate(w);
 }
-static FloatlandBar* hit(Point point) {
+static FloatlandBar* hit(Point point, bool activation=false) {
     if (g_pSessionLockManager->isSessionLocked() || g_pInputManager->isConstrained()) return nullptr;
     const Vector2D p{point.x, point.y};
     auto monitor = State::monitorState()->query().vec(p).run();
@@ -339,7 +377,7 @@ static FloatlandBar* hit(Point point) {
         return nullptr;
     refresh(w);
     for (auto* bar : bars)
-        if (bar->owner() == w && bar->visible() && bar->globalBox().contains(point)) return bar;
+        if (bar->owner() == w && bar->pointerHit(point,activation)) return bar;
     return nullptr;
 }
 static void action(FloatlandBar* bar, Control control) {
@@ -395,7 +433,7 @@ static int geometryLua(lua_State* L) {
     return 1;
 }
 static void restoreDuringDrag(Point pointer) {
-    if (!draggingOurWindow() || !click.moved(pointer) || restoredDuringDrag || !captured->restoreSize) return;
+    if ((captured && captured->mini()) || !draggingOurWindow() || !click.moved(pointer) || restoredDuringDrag || !captured->restoreSize) return;
     const auto w = captured->owner();
     const auto target = w->layoutTarget();
     auto monitor = State::monitorState()->query().vec(Vector2D{pointer.x, pointer.y}).run();
@@ -422,7 +460,24 @@ static void restoreDuringDrag(Point pointer) {
     dragEvent(w, "drag-restored", rectPayload(CBox{rect.x, rect.y, rect.w, rect.h}));
 }
 static void mouseButton(IPointer::SButtonEvent e, Event::SCallbackInfo& info) {
+    if (WindowMenu::button(e,info)) return;
     if (TaskUI::button(e, info)) return;
+    // Consume both sides of the context-menu or mini-mode escape gesture.
+    static bool pipRelease = false;
+    if (e.button == 273) {
+        if (e.state == WL_POINTER_BUTTON_STATE_RELEASED && pipRelease) {
+            pipRelease = false; info.cancelled = true; return;
+        }
+        if (e.state == WL_POINTER_BUTTON_STATE_PRESSED && !info.cancelled && !consumeRelease) {
+            const auto p = g_pInputManager->getMouseCoordsInternal();
+            if (auto* bar = hit({p.x,p.y},true)) {
+                if(bar->mini()) dragEvent(bar->owner(), "mini-mode-off");
+                else WindowMenu::show(bar->owner(),{p.x,p.y});
+                pipRelease = true; info.cancelled = true;
+            }
+        }
+        return;
+    }
     if (e.button != 272) return;
     const auto cursor = g_pInputManager->getMouseCoordsInternal();
     const Point point{cursor.x, cursor.y};
@@ -434,7 +489,7 @@ static void mouseButton(IPointer::SButtonEvent e, Event::SCallbackInfo& info) {
         // plugin reload. Our swallowed press/motion still owns this release.
         const bool dragged = ownsSnapDrop(ownedDrag, bar && bar->visible(),
             movedDuringPress || click.moved(point), draggingOurWindow());
-        updateSnap(point, dragged);
+        updateSnap(point, dragged && bar && bar->owner() && !bar->owner()->m_pinned);
         const auto zone = selectedZone;
         const auto dropWindow = bar ? bar->owner() : nullptr;
         endDrag();
@@ -514,7 +569,7 @@ struct Listeners {
                 m->m_solitaryClient.reset();
             }
         });
-        tasksKey = Event::bus()->m_events.input.keyboard.key.listen(TaskUI::key);
+        tasksKey = Event::bus()->m_events.input.keyboard.key.listen([](IKeyboard::SKeyEvent e, Event::SCallbackInfo& info) { if(!WindowMenu::key(e,info)) TaskUI::key(e,info); });
         tasksAxis = Event::bus()->m_events.input.mouse.axis.listen(TaskUI::scroll);
         open = Event::bus()->m_events.window.open.listen([](PHLWINDOW w) {
             // A newly mapped window is not part of the frozen overview scene.
@@ -529,6 +584,9 @@ struct Listeners {
         workspace = Event::bus()->m_events.window.moveToWorkspace.listen([](PHLWINDOW w, PHLWORKSPACE) { refresh(w); });
         render = Event::bus()->m_events.render.stage.listen([](eRenderStage stage) {
             if(stage==RENDER_POST) OverviewFilter::restoreSolitary();
+            if (stage == RENDER_LAST_MOMENT && WindowMenu::valid() && !TaskUI::kind && !TaskUI::capturing)
+                g_pHyprRenderer->addPassElement(makeUnique<WindowMenu::Pass>());
+            if (TaskUI::kind && WindowMenu::owner.lock()) WindowMenu::hide();
             if (stage == RENDER_LAST_MOMENT && TaskUI::kind && !TaskUI::capturing)
                 g_pHyprRenderer->addPassElement(makeUnique<TaskUI::Pass>());
             if (stage == RENDER_POST_WINDOWS && draggingOurWindow())
@@ -539,7 +597,11 @@ struct Listeners {
         });
         button = Event::bus()->m_events.input.mouse.button.listen(mouseButton);
         move = Event::bus()->m_events.input.mouse.move.listen([](Vector2D p, Event::SCallbackInfo&) {
+            WindowMenu::pointer({p.x,p.y});
             TaskUI::pointerMove({p.x,p.y});
+            const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+            auto* activation=hit({p.x,p.y},true);
+            for(auto* bar:bars) bar->tickMini(seconds,bar==activation,captured==bar && click.active);
             if (captured && click.active && click.pressed != Control::None) {
                 captured->pressOffset = buttonPull({p.x-click.origin.x,p.y-click.origin.y});
                 captured->damageEntire();
@@ -554,6 +616,7 @@ struct Listeners {
             }
         });
         lock = g_pSessionLockManager->m_events.lock.listen([] {
+            WindowMenu::hide();
             TaskUI::reset();
             TaskUI::emit("cancel");
             if (captured) dragEvent(captured->owner(), "drag-end");
@@ -567,10 +630,39 @@ struct Listeners {
 };
 static UP<Listeners> listeners;
 
+static int pictureInPictureLua(lua_State* L) {
+    auto w=TaskUI::find(luaL_checkstring(L,1),luaL_checkinteger(L,2));
+    if (!w) return 0;
+    std::erase_if(pipWindows,[&](const auto& item) { return !item.lock() || item.lock()==w; });
+    if(lua_toboolean(L,3)) pipWindows.push_back(w);
+    resyncBars();
+    return 0;
+}
+static int miniModeLua(lua_State* L) {
+    auto w=TaskUI::find(luaL_checkstring(L,1),luaL_checkinteger(L,2));
+    if(!w) return 0;
+    for(auto* bar:bars) if(bar->owner()==w) { bar->damageEntire(); bar->miniState.reset(); }
+    std::erase_if(miniWindows,[&](const auto& item) { return !item.lock() || item.lock()==w; });
+    if(lua_toboolean(L,3)) miniWindows.push_back(w);
+    resyncBars(); return 0;
+}
+static int tickUiLua(lua_State*) {
+    std::erase_if(miniWindows, [](const auto& item) { return !item.lock(); });
+    if (miniWindows.empty() && !WindowMenu::monitor.lock()) return 0;
+    const auto p=g_pInputManager->getMouseCoordsInternal();
+    auto* over=hit({p.x,p.y},true);
+    const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    for(auto* bar:bars) bar->tickMini(seconds,bar==over,captured==bar && click.active);
+    if(WindowMenu::monitor.lock() && !WindowMenu::valid()) WindowMenu::hide();
+    return 0;
+}
 APICALL EXPORT std::string PLUGIN_API_VERSION() { return HYPRLAND_API_VERSION; }
 APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     handle = h;
     TaskUI::reset();
+    pipWindows.clear();
+    miniWindows.clear();
+    WindowMenu::hide();
     captured = nullptr;
     click = {};
     ownedDrag = consumeRelease = movedDuringPress = restoredDuringDrag = false;
@@ -579,7 +671,10 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     snapMonitor.reset();
     if (std::string(__hyprland_api_get_hash()) != std::string(__hyprland_api_get_client_hash()))
         throw std::runtime_error("Floatland titlebars: compositor/header ABI mismatch; rebuild for installed Hyprland");
-    if (!HyprlandAPI::addLuaFunction(handle, "floatland", "appearance", appearanceLua) ||
+    if (!HyprlandAPI::addLuaFunction(handle, "floatland", "mini", miniModeLua) ||
+        !HyprlandAPI::addLuaFunction(handle, "floatland", "tick_ui", tickUiLua) ||
+        !HyprlandAPI::addLuaFunction(handle, "floatland", "pip", pictureInPictureLua) ||
+        !HyprlandAPI::addLuaFunction(handle, "floatland", "appearance", appearanceLua) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "geometry", geometryLua) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "restore_size", restoreSizeLua) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "refresh", refreshLua))
@@ -596,9 +691,11 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     OverviewFilter::install(handle);
     try { listeners = makeUnique<Listeners>(); resyncBars(); }
     catch(...) { listeners.reset(); OverviewFilter::remove(handle); throw; }
-    return {"floatland-bars", "Native floating titlebars with shared render/input geometry", "Floatland / Hypr Development", "0.6.5e"};
+    return {"floatland-bars", "Native floating titlebars with shared render/input geometry", "Floatland / Hypr Development", "0.6.10e"};
 }
 APICALL EXPORT void PLUGIN_EXIT() {
+    WindowMenu::hide();
+    g_pHyprRenderer->m_renderPass.removeAllOfType("FloatlandWindowMenuPass");
     TaskUI::reset();
     OverviewFilter::remove(handle);
     listeners.reset();

@@ -5,13 +5,25 @@ from pathlib import Path
 import re
 
 DEFAULTS = {
-    "remember_sizes": True, "default_mode": "floating", "gap": 10, "width": .65, "height": .72,
+    "remember_sizes": True, "remember_xwayland_sizes": False, "default_mode": "floating", "gap": 10, "width": .65, "height": .72,
     "cascade_step": 28, "exclude_classes": [], "workspace_modes": {}, "titlebar_height": 0,
     "titlebar_style": {}, "appearance": {},
 }
 
 
-APPEARANCE = {'titlebar_color': '#1b2029',
+APPEARANCE = {'mini_color': '#1b2029',
+ 'mini_opacity': 0.94,
+ 'mini_border_color': '#aeb8ca',
+ 'mini_border_opacity': 0.35,
+ 'mini_border_width': 1,
+ 'mini_width': 128,
+ 'mini_height': 32,
+ 'mini_button_size': 14,
+ 'mini_button_spacing': 16,
+ 'mini_offset': 4,
+ 'mini_duration': 0.16,
+ 'mini_timeout': 4,
+ 'titlebar_color': '#1b2029',
  'titlebar_opacity': 1.0,
  'snap_color': '#4d99ff',
  'snap_opacity': 0.18,
@@ -24,6 +36,8 @@ APPEARANCE = {'titlebar_color': '#1b2029',
  'close_color': '#f55c57',
  'minimize_color': '#fabe2e',
  'maximize_color': '#33c459',
+ 'button_size': 14,
+ 'button_spacing': 18,
  'button_shift': 0.9,
  'button_stretch': 1.5,
  'button_return_duration': 0.28,
@@ -60,7 +74,19 @@ APPEARANCE = {'titlebar_color': '#1b2029',
  'tab_mouse': True,
  'tab_preview_width': 240}
 
-APPEARANCE_RULES = {'titlebar_color': ['color'],
+APPEARANCE_RULES = {'mini_color': ['color'],
+ 'mini_opacity': [0, 1],
+ 'mini_border_color': ['color'],
+ 'mini_border_opacity': [0, 1],
+ 'mini_border_width': [0, 4],
+ 'mini_width': [96, 320],
+ 'mini_height': [28, 64],
+ 'mini_button_size': [8, 24],
+ 'mini_button_spacing': [0, 40],
+ 'mini_offset': [0, 32],
+ 'mini_duration': [0.035, 0.5],
+ 'mini_timeout': [0.5, 30],
+ 'titlebar_color': ['color'],
  'titlebar_opacity': [0, 1],
  'snap_color': ['color'],
  'snap_opacity': [0, 1],
@@ -73,6 +99,8 @@ APPEARANCE_RULES = {'titlebar_color': ['color'],
  'close_color': ['color'],
  'minimize_color': ['color'],
  'maximize_color': ['color'],
+ 'button_size': [8, 20],
+ 'button_spacing': [0, 40],
  'button_shift': [0, 2],
  'button_stretch': [0, 2],
  'button_return_duration': [0.05, 0.5],
@@ -155,6 +183,8 @@ def validate(value):
     config = dict(deepcopy(DEFAULTS), **value)
     if config["default_mode"] not in ("floating", "tiling"):
         raise ValueError("default_mode must be floating or tiling")
+    if type(config["remember_xwayland_sizes"]) is not bool:
+        raise ValueError("remember_xwayland_sizes must be boolean")
     if type(config["remember_sizes"]) is not bool:
         raise ValueError("remember_sizes must be boolean")
     for key in ("gap", "cascade_step", "titlebar_height"):

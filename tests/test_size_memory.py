@@ -78,3 +78,26 @@ class SizeMemoryTests(unittest.TestCase):
         self.manager.reconcile()
         self.assertLessEqual(self.ipc.clients[1]['size'][0], 1920)
         self.assertLessEqual(self.ipc.clients[1]['size'][1], 1080)
+
+    def test_xwayland_saved_helper_size_is_not_applied_or_overwritten(self):
+        self.memory.remember(dict(self.ipc.clients[0], size=[80, 50]))
+        self.ipc.clients.append(window(2, floating=True, xwayland=True))
+        self.manager.reconcile()
+        self.assertEqual(self.ipc.clients[1]['size'], [700, 500])
+        self.ipc.clients[1]['size'] = [12, 12]
+        self.manager.refresh()
+        self.assertNotEqual(self.memory.get(self.ipc.clients[1]), [12, 12])
+
+    def test_xwayland_memory_is_explicitly_opt_in(self):
+        self.manager.refresh()
+        self.manager.config['remember_xwayland_sizes'] = True
+        self.memory.remember(dict(self.ipc.clients[0], size=[820, 610]))
+        self.ipc.clients.append(window(2, floating=True, xwayland=True))
+        self.manager.reconcile()
+        self.assertEqual(self.ipc.clients[1]['size'], [820, 610])
+
+    def test_override_redirect_menu_is_not_managed(self):
+        self.ipc.clients.append(window(2, floating=False, xwayland=True, override_redirect=True))
+        self.manager.reconcile()
+        self.assertFalse(self.ipc.clients[1]['floating'])
+        self.assertNotIn('0x2', self.manager.windows)

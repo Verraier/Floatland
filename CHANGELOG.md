@@ -1,3 +1,75 @@
+# 0.6.10e — GTK controls use Floatland drawing and interaction
+
+- Replace themed GtkButton widgets with a centered Cairo control canvas. No
+  standard GTK button background, vertical fill, or square maximize glyph.
+- Share the native button pull, directional deformation and bounded spring
+  calculations. Add group-hover symbols, press highlight, shifted centers,
+  gradient texture, inactive colors, and release-outside cancellation.
+- Read size, spacing, colors and motion settings live from titlebars.lua.
+- Scope GTK status files to the launched PID, prevent helper activation, and
+  avoid repeated writes when status does not change.
+- Keyboard access: Tab focuses the control group, Left/Right selects an action,
+  Enter/Space activates it. Layout remains a three-button group on the left.
+- Linux GTK graphics and the new C++ adapter still need live build/runtime
+  validation; the Python and standalone native checks are not a GTK GUI test.
+
+# 0.6.9e — mini-titlebar feedback
+
+- Center the mini button group using shared drawing/hit geometry.
+- Slide the capsule in/out; reverse continuously. Pointer departure hides it
+  immediately, with the four-second timeout applying while hovered. Held
+  gestures defer hiding until release; right-click escape remains available.
+- Add live `config/mini-titlebar.lua` without overwriting existing init.lua.
+- Report GTK module/headerbar status and reject silent existing-process handoff.
+- Detect Qt5 and use the regular compositor-decoration fallback instead of
+  attempting to load a Qt6 plugin. Native Qt5 integration remains unimplemented.
+- Add cached private adaptation of installed AUR Equibop packages, using their
+  existing Electron runtime; no application source build is required.
+- Validation: 231 Python/Lua tests, four standalone C++ suites and JavaScript
+  syntax checks. Linux graphics, GTK and real packaged Electron execution remain
+  unverified; this release is experimental.
+
+# 0.6.8e — optional integrations and mini-mode experiment
+
+- Replaced titlebar right-click PiP toggle with an addressed context menu: Close,
+  Minimize, Fullscreen, Pin above and independent Mini-mode.
+- Pin above no longer forces a compact size. The legacy `pip` command remains.
+- Mini-mode removes reserved titlebar height and reveals a compact control
+  capsule on hover, with a four-second timeout and no jelly motion. Right-click
+  its visible or hidden activation region to restore the normal titlebar.
+- Added GTK4/libadwaita GNOME Software preload prototype and an isolated Equibop
+  source adapter. Both insert controls in existing headers. Qt remains optional.
+- Stable overview, switcher and XWayland size-memory safeguards are retained.
+- Full compositor/toolkit builds and graphics require Linux validation. See
+  `docs/experiment-0.6.8e.md` and `integrations/README.md` before testing adapters.
+
+# 0.6.7 — stable promotion
+
+Promotes the user-tested 0.6.7e behavior unchanged. The redesigned context menu and mini-mode remain planned for 0.6.8e. Qt client decorations remain optional and experimental. Linux graphics validation is based on user testing, not an automated compositor run.
+
+# 0.6.7e
+
+- Validation: 216 Python/Lua tests and three standalone native logic suites pass on macOS.
+
+- Added addressed PiP mode: compact aspect-preserving placement, pin across workspaces, raise above normal application windows on focus/open/workspace events, and restore previous geometry.
+- Right-click a native titlebar to toggle PiP; green returns from PiP, yellow restores then minimizes, red closes. PiP has a title indicator and remains draggable without snap interception.
+- PiP state survives a Floatland restart within the same Hyprland session; stop --restore recovers it. It never overwrites application size memory.
+- Added live Lua button_size (8..20 logical pixels), including symbols, spacing, and resting hit targets; optional Qt decoration reads the same setting.
+- Increased pull resistance near the origin, separated visible center travel from deformation, and strengthened the single bounded return rebound.
+- Routine XWayland size-memory skip messages now use DEBUG, retaining the Steam workaround.
+- Full native build, graphics, PiP stacking/fullscreen interactions and Qt behavior require Linux validation. PiP does not extract video from an application: use the browser's own video pop-out first when needed. Shell overlays and lock screens retain compositor-controlled ordering.
+
+# 0.6.6e
+
+- Button motion follow-up: gentler response, earlier saturation, and directional leading-edge stretch instead of symmetric expansion.
+
+- Fixed titlebar texture dimensions changing with position at fractional scales.
+- Added configurable button_spacing with shared paint/hit-test geometry.
+- Reworked button pull into a saturating response with area-preserving deformation.
+- Disabled persistent size restore/recording for XWayland by default; opt-in remains available.
+- Added regression coverage and size-restoration diagnostics.
+- Top-only window rounding remains unresolved; no new render hooks were introduced.
+
 # Changelog
 
 Newest first. Versions with an `e` suffix are experimental.

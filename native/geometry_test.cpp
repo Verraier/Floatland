@@ -9,15 +9,56 @@ using namespace Floatland;
 
 int main() {
     const auto diagonal=buttonPull({100,100});
-    assert(std::abs(std::hypot(diagonal.x,diagonal.y)-1)<1e-12);
+    assert(std::hypot(diagonal.x,diagonal.y)<.71 && std::hypot(diagonal.x,diagonal.y)>.7);
     const auto right=buttonPull({14,0});
-    assert(right.x==.5 && right.y==0);
+    assert(right.x<.2 && right.x>.18 && right.y==0);
     assert(buttonPull({0,0}).x==0);
     assert(buttonReturn(0)==1 && buttonReturn(BUTTON_RETURN_SECONDS)==0);
+    double last=0,lastGain=1;
+    for(int distance=1;distance<=1000;++distance) {
+        const auto pull=buttonPull({double(distance),0});
+        assert(pull.x>last && pull.x<1);
+        const double gain=pull.x-last;
+        assert(gain<=lastGain);
+        last=pull.x;lastGain=gain;
+        const auto shape=buttonDeformation(7,pull.x,1.5);
+        assert(shape.along>7 && shape.across<7);
+        assert(std::abs((shape.front+shape.back)*.5*shape.across-49)<1e-9);
+        assert(shape.back==7 && shape.front>7);
+        // In every direction the trailing edge moves toward the cursor, never away.
+        for(const auto direction : {Point{1,0},Point{-1,0},Point{0,1},Point{0,-1}}) {
+            const auto directed=buttonPull({direction.x*distance,direction.y*distance});
+            const double shift=4*.9*(directed.x*direction.x+directed.y*direction.y);
+            assert(shift>0 && shift<3.6);
+            assert(shift-shape.back>-7);
+            assert(shift+shape.front>7);
+        }
+    }
+    for(double scale:{1.,1.07,1.25,1.5,2.}) {
+        const auto reference=titlebarPixels({0,0,700,32},{0,0},scale);
+        for(int y=-1000;y<=1000;++y) {
+            const auto moved=titlebarPixels({y*.13,y*.17,700,32},{0,0},scale);
+            assert(moved.w==reference.w && moved.h==reference.h);
+            assert(std::abs(moved.y+moved.h-(y*.17+32)*scale)<=.500001);
+        }
+    }
+    for(bool left:{false,true}) for(double spacing:{0.,4.,18.,40.}) {
+        const auto order=buttonOrder("maximize,minimize,close");
+        const auto a=buttonRect(800,Control::Close,left,order,spacing);
+        const auto b=buttonRect(800,Control::Minimize,left,order,spacing);
+        assert(std::abs(a.x-b.x)==14+spacing);
+        assert(hitButtonCircle({0,0,800,32},{a.x+16,16},left,order,spacing)==Control::Close);
+    }
+    for(double size:{8.,14.,20.}) for(bool left:{false,true}) {
+        const auto order=buttonOrder("maximize,minimize,close");
+        const auto cell=buttonRect(800,Control::Close,left,order,18,size);
+        assert(hitButtonCircle({0,0,800,32},{cell.x+16,16+size/2-.01},left,order,18,size)==Control::Close);
+        assert(hitButtonCircle({0,0,800,32},{cell.x+16,16+size/2+.01},left,order,18,size)==Control::None);
+    }
     int negativeRuns=0; bool negative=false;
     for(int i=0;i<=1000;++i) {
         const double value=buttonReturn(BUTTON_RETURN_SECONDS*i/1000.0);
-        assert(value>=-.120001 && value<=1);
+        assert(value>=-.240001 && value<=1);
         const bool next=value < -1e-10;
         if(next && !negative) ++negativeRuns;
         negative=next;

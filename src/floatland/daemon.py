@@ -76,6 +76,11 @@ async def run(directory, config, config_path=None, unified=False):
                 reader, writer = await asyncio.open_unix_connection(str(directory / ".socket2.sock"))
                 # Subscribe first, then enumerate so windows opened during startup are not lost.
                 controller.reconcile()
+                for client in controller.clients:
+                    if controller.pip.active(client):
+                        ipc.set_pip(client, True)
+                    if controller.windows.get(client["address"],{}).get("mini"):
+                        ipc.set_mini(client,True)
                 ipc.resync_bars()
                 LOG.info("Startup sync: %d live windows, %d managed records", len(controller.clients), len(controller.windows))
                 if not announced:
@@ -94,6 +99,7 @@ async def run(directory, config, config_path=None, unified=False):
                     if event == 'activewindowv2':
                         controller.refresh()
                         controller.tasks.focused('0x' + payload.removeprefix('0x'))
+                        controller.pip.raise_all()
                     if event == 'floatland_tasks':
                         try:
                             parts = payload.split(',')

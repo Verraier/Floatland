@@ -1,12 +1,9 @@
-# Floatland native part
+# Нативная часть Floatland 0.5.0
 
-Normal start from the repository root: `python3 run.py`. No separate installation is required.
-Hyprland 0.56.2; the ABI is checked before building and loading.
+Обычный запуск из корня: `python3 run.py`. Отдельная установка не требуется.
+Hyprland 0.56.2, проверка ABI перед сборкой и загрузкой.
 
-- `main.cpp` / `titlebar.cpp` — title bars, snap and restore.
-- `tasks.hpp`, `switcher-*.hpp` — keyboard switcher (Alt+Tab) and its layout/preparation.
-- `overview-*.hpp` — overview layout, filter and state machine.
-- `*_test.cpp` — standalone logic tests, built by CMake.
-
-A full build and check of the plugin requires Linux with Hyprland 0.56.2 headers.
-License and origin: `LICENSE`, `NOTICE.md`, `LICENSE.hyprbars`.
+main.cpp/titlebar.cpp — заголовки, snap и restore.
+tasks.hpp — клавиатурный переключатель, панель задач и список свёрнутых.
+Полная сборка нового UI 0.5.0 на Linux здесь не проверена.
+Лицензия и происхождение: LICENSE, NOTICE.md, LICENSE.hyprbars.

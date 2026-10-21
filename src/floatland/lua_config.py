@@ -12,11 +12,12 @@ import sys
 from .ipc import lua_string
 
 SECTIONS = {
+    'mini-titlebar': {'color': 'mini_color', 'opacity': 'mini_opacity', 'border_color': 'mini_border_color', 'border_opacity': 'mini_border_opacity', 'border_width': 'mini_border_width', 'width': 'mini_width', 'height': 'mini_height', 'button_size': 'mini_button_size', 'button_spacing': 'mini_button_spacing', 'offset': 'mini_offset', 'duration': 'mini_duration', 'timeout': 'mini_timeout'},
     'windows': None,
     'titlebars': {'enabled':'titlebars_enabled','color':'titlebar_color','opacity':'titlebar_opacity',
                  'text_color':'titlebar_text_color','font_size':'titlebar_font_size',
                  'close_color':'close_color','minimize_color':'minimize_color','maximize_color':'maximize_color',
-                 'button_shift':'button_shift','button_stretch':'button_stretch',
+                 'button_size':'button_size','button_spacing':'button_spacing','button_shift':'button_shift','button_stretch':'button_stretch',
                  'return_duration':'button_return_duration','rebound':'button_rebound','texture':'button_texture',
                  'buttons_side':'buttons_side','buttons_order':'buttons_order','title_alignment':'title_alignment',
                  'title_enabled':'title_enabled','highlight':'button_highlight','growth':'button_growth',
@@ -94,6 +95,7 @@ def read_lua(path):
                'return assert(loadfile(path))() end\n' + SERIALIZER + '\n' +
                'local value=assert(loadfile(' + lua_string(str(path)) + '))()\n' +
                'assert(type(value)=="table", "init.lua must return a table")\n' +
+               ('if value["mini-titlebar"]==nil then value["mini-titlebar"]=section("mini-titlebar") end\n' if path.name == 'init.lua' else '') +
                'io.write(' + lua_string(MARKER) + ',encode(value,{}))\n')
     try:
         result = subprocess.run(runtime(), input=program, text=True, capture_output=True, timeout=5)
@@ -229,7 +231,15 @@ def initialize(root):
     """Publish init.lua last; never replace user files or remove legacy JSON."""
     from .config import validate
     root = Path(root)
-    if (root/'init.lua').exists(): return
+    if (root/'init.lua').exists():
+        target = root/'config'/'mini-titlebar.lua'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with target.open('x') as file:
+                file.write((Path(__file__).with_name('defaults')/'config'/'mini-titlebar.lua').read_text())
+        except FileExistsError:
+            pass
+        return
     runtime()  # Check dependencies before creating files.
     templates = Path(__file__).with_name('defaults')
     legacy = root/'config.json'
@@ -262,6 +272,8 @@ def initialize(root):
 def load_lua(path=None, create=False):
     path = Path(path) if path is not None else config_home()/'init.lua'
     if path.is_dir(): path = path/'init.lua'
+    if create and path.name == 'init.lua' and path.exists():
+        initialize(path.parent)
     if create and not path.exists():
         if path.name != 'init.lua': raise ValueError('New configuration entry must be named init.lua')
         initialize(path.parent)

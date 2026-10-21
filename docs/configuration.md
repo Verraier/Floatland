@@ -244,3 +244,10 @@ the selected window.
 Titlebar appearance settings (colors, button side/order, title alignment) are also exported to
 the optional Qt prototype while its launcher runs. See
 [integrations/qt/README.md](../integrations/qt/README.md).
+
+## Stable 0.6.7 additions
+
+- `titlebars.button_size`: resting diameter, 8..20 logical pixels, default 14. Icons and hit targets follow the diameter.
+- `titlebars.button_spacing`: gap between circles, 0..40 logical pixels, default 18.
+- `windows.remember_xwayland_sizes`: false by default; avoids applying saved application sizes to Steam/XWayland windows.
+- Right-click a native titlebar or run `python3 run.py pip` to enter/leave the current PiP window mode. Green restores the previous geometry. This differs from the planned 0.6.8e mini-mode.

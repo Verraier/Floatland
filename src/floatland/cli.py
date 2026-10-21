@@ -47,7 +47,7 @@ def parser():
     snapping = commands.add_parser("snap", help="Snap active window; restore returns its previous geometry")
     snapping.add_argument("value", choices=ZONES)
     for name in ("toggle", "window-toggle", "window-auto", "maximize", "restore", "center",
-                 "minimize", "close", "pin", "restore-minimized", "status", "doctor"):
+                 "minimize", "close", "pin", "pip", "pin-above", "mini-mode", "mini-mode-off", "fullscreen", "restore-minimized", "status", "doctor"):
         commands.add_parser(name)
     bars = commands.add_parser("titlebars", help="Legacy upstream hyprbars integration; use run.py for bundled native titlebars")
     actions = bars.add_subparsers(dest="titlebar_action", required=True)

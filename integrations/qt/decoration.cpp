@@ -29,6 +29,8 @@ class FloatlandDecoration final : public QWaylandAbstractDecoration {
     QString appId;
     QTimer timer;
     static constexpr int border=3;
+    double diameter() const { return settings.value("button_size").toDouble(14); }
+    double spacing() const { return settings.value("button_spacing").toDouble(18); }
     bool left() const { return settings.value("buttons_side").toString("right")=="left"; }
     Floatland::ButtonOrder order() const {
         return Floatland::buttonOrder(settings.value("buttons_order").toString("maximize,minimize,close").toStdString());
@@ -39,7 +41,7 @@ class FloatlandDecoration final : public QWaylandAbstractDecoration {
     }
     Floatland::Control hit(const QPointF& p) const {
         return Floatland::hitButtonCircle({0,0,double(waylandWindow()->surfaceSize().width()),32},
-                                         {p.x(),p.y()},left(),order());
+                                         {p.x(),p.y()},left(),order(),spacing(),diameter());
     }
     void activate(Floatland::Control action) {
         if(action==Floatland::Control::None || appId.isEmpty()) return;
@@ -108,7 +110,7 @@ public:
         QColor background=color("titlebar_color","#1b2029");
         background.setAlphaF(settings.value("titlebar_opacity").toDouble(1));
         p.fillRect(QRectF(0,0,width,32),background);
-        const auto bounds=Floatland::titleRect(width,left(),order());
+        const auto bounds=Floatland::titleRect(width,left(),order(),spacing(),diameter());
         if(settings.value("title_enabled").toBool(true)) {
             p.setPen(color("titlebar_text_color","#edf2ff"));
             QFont font=p.font();font.setPointSize(settings.value("titlebar_font_size").toInt(10));p.setFont(font);
@@ -120,13 +122,13 @@ public:
         const char* defaults[]={"#f55c57","#fabe2e","#33c459"};
         for(int i=0;i<3;++i) {
             const auto action=static_cast<Floatland::Control>(i);
-            const auto cell=Floatland::buttonRect(width,action,left(),order());
+            const auto cell=Floatland::buttonRect(width,action,left(),order(),spacing(),diameter());
             if(cell.w<=0) continue;
             QColor base=color(keys[i],defaults[i]);
             if(!window()->isActive()) base.setAlphaF(.5);
             if(pressed==action && hovered==action) base=base.lighter(125);
             const QPointF center(cell.x+cell.w/2,16);
-            const double radius=pressed==action && hovered==action?7.8:7;
+            const double radius=diameter()/2+(pressed==action && hovered==action?.8:0);
             p.setPen(Qt::NoPen);
             QLinearGradient gradient(center.x(),16-radius,center.x(),16+radius);
             gradient.setColorAt(0,base.lighter(125));gradient.setColorAt(.45,base);gradient.setColorAt(1,base.darker(110));
@@ -134,6 +136,7 @@ public:
             p.drawEllipse(center,radius,radius);
             if(!settings.value("button_icons").toBool(true) ||
                (settings.value("button_hover_only").toBool(true) && hovered==Floatland::Control::None)) continue;
+            p.save(); p.translate(center); p.scale(diameter()/14,diameter()/14); p.translate(-center);
             p.setPen(QPen(base.darker(230),1.6,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
             p.setBrush(Qt::NoBrush);
             if(i==0) {
@@ -141,6 +144,7 @@ public:
                 p.drawLine(center+QPointF(-2.5,2.5),center+QPointF(2.5,-2.5));
             } else if(i==1) p.drawLine(center+QPointF(-3,0),center+QPointF(3,0));
             else p.drawRect(QRectF(center.x()-2.5,center.y()-2.5,5,5));
+            p.restore();
         }
         p.fillRect(QRectF(0,32,border,waylandWindow()->surfaceSize().height()-32),background);
         p.fillRect(QRectF(width-border,32,border,waylandWindow()->surfaceSize().height()-32),background);

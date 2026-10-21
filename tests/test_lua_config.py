@@ -25,6 +25,27 @@ class LuaConfigTests(unittest.TestCase):
     def write(self, section, text):
         (self.root/'config'/(section+'.lua')).write_text(text)
 
+    def test_mini_config_upgrades_old_init_without_rewriting_it(self):
+        self.entry.write_text('return {titlebars=section("titlebars")}')
+        original=self.entry.read_bytes()
+        load(self.entry,create=True)
+        self.assertEqual(self.entry.read_bytes(),original)
+        self.assertTrue((self.root/'config/mini-titlebar.lua').is_file())
+        self.write('mini-titlebar','return {width=180,height=44,button_size=20,opacity=.5,duration=.2}')
+        appearance=load(self.entry)['appearance']
+        self.assertEqual(appearance['mini_width'],180)
+        self.assertEqual(appearance['mini_height'],44)
+        self.assertEqual(appearance['mini_opacity'],.5)
+        self.write('mini-titlebar','return {opacity=2}')
+        with self.assertRaisesRegex(ValueError,'mini-titlebar'): load(self.entry)
+
+    def test_button_diameter_roundtrip(self):
+        load(self.entry, create=True)
+        self.write('titlebars', 'return { button_size=18, button_spacing=4 }')
+        settings = load(self.entry)['appearance']
+        self.assertEqual(settings['button_size'],18)
+        self.assertEqual(settings['button_spacing'],4)
+
     def test_init_default_sections_and_theme_precedence(self):
         settings = load(self.entry, create=True)
         self.assertEqual(settings['appearance'], APPEARANCE)

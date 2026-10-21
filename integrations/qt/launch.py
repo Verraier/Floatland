@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import shutil
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
@@ -29,8 +30,19 @@ def child_environment(base, plugins, settings):
     return env
 
 
+def detect_qt_major(command):
+    executable=shutil.which(command) or command
+    try:
+        result=subprocess.run(['ldd',executable],capture_output=True,text=True,timeout=5)
+    except (OSError,subprocess.SubprocessError): return None
+    if 'libQt6Core.so' in result.stdout: return '6'
+    if 'libQt5Core.so' in result.stdout: return '5'
+    return None
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--qt-major', choices=('auto','5','6'), default='auto')
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('application', nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
@@ -47,7 +59,18 @@ def main(argv=None):
                      'this prototype supports Qt 6 applications only, not Firefox/GTK/Electron')
     if sys.platform != 'linux':
         parser.error('Qt Wayland integration requires Linux; normal Floatland is unaffected')
-    build = HERE / 'build'
+    major=args.qt_major if args.qt_major!='auto' else detect_qt_major(command[0]) if command else '6'
+    if major=='5' and not args.build_only:
+        print('Qt 5 detected: using the full Floatland compositor titlebar (including jelly), not a Qt 6 decoration in a Qt 5 process. Native Qt 5 embedding is not implemented.',file=sys.stderr)
+        env=dict(os.environ, QT_QPA_PLATFORM='wayland', QT_WAYLAND_DISABLE_WINDOWDECORATION='1')
+        env.pop('QT_WAYLAND_DECORATION',None)
+        try: return subprocess.call(command,env=env)
+        except OSError as error:
+            print('Qt launch failed:',error,file=sys.stderr); return 1
+        except KeyboardInterrupt: return 130
+    if major is None:
+        print('WARNING: Qt major version could not be detected. This native decoration requires Qt 6. Use --qt-major 5 for the compositor-decoration fallback.',file=sys.stderr)
+    build = HERE / 'build' 
     try:
         subprocess.run(['cmake', '-S', str(HERE), '-B', str(build), '-DCMAKE_BUILD_TYPE=RelWithDebInfo'], check=True)
         subprocess.run(['cmake', '--build', str(build), '-j2'], check=True)

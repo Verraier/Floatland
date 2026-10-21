@@ -91,6 +91,14 @@ class Hyprland:
                       str(int(client['pid'])) + ',' + ('true' if remember else 'false') + ') end',
                       'save minimized preview' if remember else 'forget minimized preview')
 
+    def set_mini(self, w, enabled):
+        self.evaluate('hl.plugin.floatland.mini(' + lua_string(w['address']) + ',' + str(int(w['pid']))
+                      + ',' + ('true' if enabled else 'false') + ')', 'configure mini-mode')
+
+    def set_pip(self, w, enabled):
+        self.evaluate('hl.plugin.floatland.pip(' + lua_string(w['address']) + ',' + str(int(w['pid']))
+                      + ',' + ('true' if enabled else 'false') + ')', 'configure PiP')
+
     def raise_window(self, w):
         self.evaluate('hl.plugin.floatland.raise_window(' + lua_string(w['address']) + ',' + str(int(w['pid'])) + ')', 'raise task')
 
@@ -103,8 +111,7 @@ class Hyprland:
                       'hl.plugin.floatland.overview_active(false) end', 'close overview')
 
     def poll_overview(self):
-        # Native overview has no external provider whose state needs polling.
-        pass
+        self.evaluate('hl.plugin.floatland.tick_ui()', 'tick window controls')
 
     def resync_bars(self):
         self.evaluate('if hl.plugin and hl.plugin.floatland and hl.plugin.floatland.refresh then '
@@ -177,6 +184,8 @@ def dispatch_lua(command, arguments):
         expression = 'hl.dsp.window.pin({window = w, action = "' + params + '"})'
     elif command == "focuswindow":
         expression = "hl.dsp.focus({window = w})"
+    elif command == "fullscreen":
+        expression = 'hl.dsp.window.fullscreen({window = w, action = "toggle", mode = "fullscreen"})'
     elif command == "closewindow":
         expression = "hl.dsp.window.close({window = w})"
     else:

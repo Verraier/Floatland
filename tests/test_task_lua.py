@@ -120,6 +120,7 @@ class TaskLuaTests(unittest.TestCase):
 
     def test_toggle_poll_and_close_overview(self):
         self.lua.execute('overview_active = true')
+        self.lua.execute("hl.plugin.floatland.tick_ui = function() end")
         self.ipc.close_overview(); self.ipc.poll_overview()
         self.assertFalse(self.lua.globals().overview_active)
 

@@ -47,25 +47,8 @@ def parser():
     snapping = commands.add_parser("snap", help="Snap active window; restore returns its previous geometry")
     snapping.add_argument("value", choices=ZONES)
     for name in ("toggle", "window-toggle", "window-auto", "maximize", "restore", "center",
-                 "minimize", "close", "pin", "pip", "restore-minimized", "status", "doctor"):
+                 "minimize", "close", "pin", "pip", "pin-above", "window-menu", "settings", "fullscreen", "restore-minimized", "status", "windows", "doctor"):
         commands.add_parser(name)
-    bars = commands.add_parser("titlebars", help="Legacy upstream hyprbars integration; use run.py for bundled native titlebars")
-    actions = bars.add_subparsers(dest="titlebar_action", required=True)
-    install = actions.add_parser("install", help="Fetch hyprbars: hyprpm (source, built by hyprpm) or a checksummed prebuilt .so")
-    install.add_argument("--method", choices=["hyprpm", "file"], default="hyprpm")
-    install.add_argument("--url", help="HTTPS URL of a prebuilt libhyprbars.so (method=file)")
-    install.add_argument("--sha256", help="Required with --url: SHA-256 of the file")
-    init = actions.add_parser("init", help="Write ~/.config/hypr/floatland-titlebars.lua (regenerated) and "
-                                           "floatland-buttons.lua (yours: created once, never overwritten)")
-    init.add_argument("--config")
-    init.add_argument("--executable", help="Command the buttons run (default: the installed floatland)")
-    init.add_argument("--dir", help="Target directory (default: ~/.config/hypr)")
-    lua = actions.add_parser("lua", help="Print/write the Lua snippet that configures hyprbars for Floatland")
-    lua.add_argument("--config")
-    lua.add_argument("--executable", help="Command the buttons run (default: the installed floatland)")
-    lua.add_argument("--output", help="Write to this file instead of stdout")
-    actions.add_parser("status", help="Is hyprbars installed and loaded?")
-    actions.add_parser("remove", help="Disable/unload hyprbars installed by Floatland")
     stop = commands.add_parser("stop")
     stop.add_argument("--restore", action="store_true", help="Recover minimized windows and original floating flags")
     return root
@@ -94,9 +77,6 @@ def main():
                 value = load(root / 'init.lua', create=args.config_action == 'init')
                 print(str(root / 'init.lua') if args.config_action == 'init' else json.dumps(value, indent=2, ensure_ascii=False))
             return
-        if args.command == "titlebars":
-            from .titlebars import run_cli
-            sys.exit(run_cli(args))
         directory = instance_dir()
         if args.command == "daemon":
             logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,

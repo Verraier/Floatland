@@ -1,34 +1,15 @@
-# Check in a real Hyprland session
+# Linux smoke checks for 0.7.0-lite3
 
-This check has not been done yet. Record the doctor output, the shell version and the result.
+Stop legacy Floatland, then run `python3 run.py` in the lite folder. The complete native build and SDK checks must succeed before runtime testing. Save logs/session.log if startup fails.
 
-1. Run `daemon --verbose` from a terminal. Open two applications and a floating dialog.
-   The applications should become floating; the dialog should keep its size.
-2. Move/resize the applications. Toggle twice: regular windows should go to tiling; after
-   returning to floating their coordinates should be restored.
-3. Open a window in each mode. Move a window to a workspace with a different mode.
-4. Check `window-toggle`, `toggle` and `window-auto`: an explicit exception is kept,
-   `window-auto` returns the workspace policy.
-5. Check every snap zone and restore, repeated maximize, center.
-   Do a snap from tiling and restore: the window should go back to tiling.
-6. Check minimize, stop, a second daemon, `restore-minimized`.
-   Restore should also work for a named workspace.
-7. Check a fullscreen video: the mode change is deferred until fullscreen is left.
-8. On a second monitor with a different scale and a panel, check snap and restore;
-   repeat with a rotated monitor and negative coordinates.
-9. Restart the shell: panels/launcher/notifications should keep working.
-   Floatland must not change the theme, focus or binding config.
-10. `stop --restore`: minimized windows come back, originally tiled windows are tiled again.
-    Then turn off the test autostart if it is no longer needed.
+- Open several Wayland apps and Steam/XWayland. Confirm no extra titlebar height, unchanged client rounding and a capsule on eligible floating windows.
+- Hover the indicator; test close/minimize/fullscreen on an unfocused window. Confirm collapsed indicators cannot accidentally close windows.
+- Drag using the handle; test edge snaps, palette, restore size and positions, and movement between monitors at different scales.
+- Open the capsule menu using right-click and green-button hover. Check Always on top and All workspaces; ensure input reaches client content after the capsule hides.
+- Open more windows than fit in the sidebar. Use Super+G, wheel, pointer and keyboard selection, including minimized and closed windows. Repeat rapidly and switch workspaces during transitions.
+- Check normal windows stay visible behind the sidebar; closing overview must not flash wallpaper or steal focus after cancellation.
+- Use Alt+Tab with few and many windows. Verify icons, mouse selection and release-to-commit.
+- Edit installed capsule/buttons settings and reload. Try invalid values and confirm the previous valid configuration remains active.
+- Stop/restart Floatland without logging out. Check dragging and snap on existing windows, restored minimized windows, state memory and no duplicate input hooks.
 
-Pay special attention to: size constraints of GTK/Qt/XWayland clients, native scrolling,
-window groups, transient dialogs, monitor disconnect, late-applied window rules.
-They are not fully modeled by the test compositor.
-
-## Titlebars (if hyprbars is installed)
-
-1. `floatland titlebars status` shows `"loaded": true`.
-2. A floating window has a title bar, a tiled one does not; check after `floatland toggle`.
-3. The ×, □, – buttons and a double click act on the window whose title bar was clicked,
-   including when it was not the active one. If it acts on another window, report it.
-4. `snap bottom` and `maximize` leave no gap and do not go under the title bar.
+Standalone logic checks on macOS cannot validate any of the rendering or compositor lifetime behavior above.

@@ -67,7 +67,7 @@ class DaemonTests(unittest.TestCase):
                                 for operation, x, y in operations:
                                     fake.dispatch('resizewindowpixel' if operation == 'resize' else 'movewindowpixel', f'exact {x} {y},{target}')
                             result = 'ok'
-                        elif request.startswith("/eval local w ="):
+                        elif request.startswith("/eval local w =") or request.startswith("/eval if not (hl.plugin"):
                             # Parse only the documented action subset, independently of
                             # the production encoder. Legacy dispatch is rejected below.
                             target = re.search(r'hl.get_window\("(address:0x[0-9a-f]+)"\)', request).group(1)
@@ -132,6 +132,9 @@ class DaemonTests(unittest.TestCase):
                     return
                 self.assertTrue(event_connected.wait(5))
                 wait_for(lambda: fake.clients[0]["floating"])
+                listed=cli('windows')
+                self.assertEqual(listed.returncode,0,listed.stderr)
+                self.assertEqual(json.loads(listed.stdout)['api_version'],1)
                 config_path.write_text('return {windows={default_mode="tiling"}}')
                 reloaded = cli('reload')
                 self.assertEqual(reloaded.returncode, 0, reloaded.stderr)

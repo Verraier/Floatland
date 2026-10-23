@@ -21,12 +21,12 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.runtime=ConfigRuntime(self.controller,self.path)
 
     async def test_manual_reload_reports_actual_path_and_applies_values(self):
-        (self.root/'config/titlebars.lua').write_text('return {color="#123456",buttons_side="left"}')
+        (self.root/'config/capsule.lua').write_text('return {color="#123456",side="left"}')
         result=await self.runtime.reload()
         self.assertEqual(result['config_path'],str(self.path.resolve()))
         self.assertEqual(result['fingerprint'],fingerprint(self.path)[:12])
         self.assertEqual(self.controller.config['appearance']['buttons_side'],'left')
-        self.assertEqual(self.ipc.configure_appearance.call_args.args[0]['titlebar_color'],'#123456')
+        self.assertEqual(self.ipc.configure_appearance.call_args.args[0]['mini_color'],'#123456')
 
     async def test_missing_or_invalid_config_preserves_running_settings(self):
         previous=self.controller.config

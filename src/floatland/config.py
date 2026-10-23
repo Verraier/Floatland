@@ -11,7 +11,19 @@ DEFAULTS = {
 }
 
 
-APPEARANCE = {'titlebar_color': '#1b2029',
+APPEARANCE = {'mini_blur':True, 'mini_maximize_icon_scale':0.9, 'maximize_icon_scale':0.9, 'mini_minimize_icon_scale':1.0, 'minimize_icon_scale':1.0, 'mini_close_icon_scale':1.22, 'close_icon_scale':1.22, 'mini_button_texture':True, 'mini_maximize_color':'#33c459', 'mini_minimize_color':'#fabe2e', 'mini_close_color':'#f55c57', 'mini_button_glow':0, 'mini_button_shadow':0.18, 'mini_icon_tint':True, 'mini_icon_size':0.55, 'mini_maximize_icon':'icons/mini/maximize.svg', 'mini_minimize_icon':'icons/mini/minimize.svg', 'mini_close_icon':'icons/mini/close.svg', 'button_glow':0, 'button_shadow':0.18, 'icon_tint':True, 'icon_size':0.55, 'maximize_icon':'icons/titlebar/maximize.svg', 'minimize_icon':'icons/titlebar/minimize.svg', 'close_icon':'icons/titlebar/close.svg', 'edge_resistance':0, 'menu_color':'#1b2029','menu_opacity':.97, 'menu_key':50, 'menu_delay': 1, 'menu_hover': True, 'focus_keep_cursor': True, 'focus_click_only': True, 'mini_color': '#1b2029',
+ 'mini_opacity': 0.94,
+ 'mini_border_color': '#aeb8ca',
+ 'mini_border_opacity': 0.35,
+ 'mini_border_width': 1,
+ 'mini_width': 160,
+ 'mini_height': 32,
+ 'mini_button_size': 14,
+ 'mini_button_spacing': 16,
+ 'mini_offset': 4,
+ 'mini_duration': 0.16,
+ 'mini_timeout': 4,
+ 'titlebar_color': '#1b2029',
  'titlebar_opacity': 1.0,
  'snap_color': '#4d99ff',
  'snap_opacity': 0.18,
@@ -46,7 +58,7 @@ APPEARANCE = {'titlebar_color': '#1b2029',
  'bindings_enabled': True,
  'alt_tab_key': 15,
  'overview_key': 34,
- 'buttons_side': 'right',
+ 'buttons_side': 'left',
  'buttons_order': 'maximize,minimize,close',
  'title_alignment': 'left',
  'title_enabled': True,
@@ -62,7 +74,19 @@ APPEARANCE = {'titlebar_color': '#1b2029',
  'tab_mouse': True,
  'tab_preview_width': 240}
 
-APPEARANCE_RULES = {'titlebar_color': ['color'],
+APPEARANCE_RULES = {'mini_blur':['bool'], 'mini_maximize_icon_scale':[0.5,1.5], 'maximize_icon_scale':[0.5,1.5], 'mini_minimize_icon_scale':[0.5,1.5], 'minimize_icon_scale':[0.5,1.5], 'mini_close_icon_scale':[0.5,1.5], 'close_icon_scale':[0.5,1.5], 'mini_button_texture':['bool'], 'mini_maximize_color':['color'], 'mini_minimize_color':['color'], 'mini_close_color':['color'], 'mini_button_glow':[0, 1], 'mini_button_shadow':[0, 1], 'mini_icon_tint':['bool'], 'mini_icon_size':[0.2, 0.9], 'mini_maximize_icon':['string'], 'mini_minimize_icon':['string'], 'mini_close_icon':['string'], 'button_glow':[0, 1], 'button_shadow':[0, 1], 'icon_tint':['bool'], 'icon_size':[0.2, 0.9], 'maximize_icon':['string'], 'minimize_icon':['string'], 'close_icon':['string'], 'edge_resistance':[0,80], 'menu_color':['color'],'menu_opacity':[0,1], 'menu_key':[1,255,'int'], 'menu_delay': [0.2, 10], 'menu_hover': ['bool'], 'focus_keep_cursor': ['bool'], 'focus_click_only': ['bool'], 'mini_color': ['color'],
+ 'mini_opacity': [0, 1],
+ 'mini_border_color': ['color'],
+ 'mini_border_opacity': [0, 1],
+ 'mini_border_width': [0, 4],
+ 'mini_width': [96, 320],
+ 'mini_height': [28, 64],
+ 'mini_button_size': [8, 24],
+ 'mini_button_spacing': [0, 40],
+ 'mini_offset': [0, 32],
+ 'mini_duration': [0.035, 0.5],
+ 'mini_timeout': [0.5, 30],
+ 'titlebar_color': ['color'],
  'titlebar_opacity': [0, 1],
  'snap_color': ['color'],
  'snap_opacity': [0, 1],
@@ -109,7 +133,7 @@ APPEARANCE_RULES = {'titlebar_color': ['color'],
  'snap_palette': ['bool'],
  'snap_edges': ['bool'],
  'snap_preview': ['bool'],
- 'tab_style': ['enum', 'icons', 'preview', 'legacy'],
+ 'tab_style': ['enum', 'icons'],
  'tab_mouse': ['bool'],
  'tab_preview_width': [160, 360, 'int']}
 
@@ -120,7 +144,9 @@ def validate_appearance(value):
     result = dict(APPEARANCE, **value)
     for key, v in result.items():
         rule = APPEARANCE_RULES[key]
-        if rule[0] == 'enum':
+        if rule[0] == 'string':
+            valid=isinstance(v,str) and len(v)<=4096 and '\x00' not in v
+        elif rule[0] == 'enum':
             valid = isinstance(v, str) and v in rule[1:]
         elif rule[0] == 'order':
             parts = v.split(',') if isinstance(v, str) and v else []

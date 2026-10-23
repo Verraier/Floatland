@@ -51,3 +51,11 @@ Floatland's native task panel extends the existing code in `native/`.
 | Hyprland | vaxerski and contributors | BSD-3-Clause | compositor and plugin API (v0.56.2) |
 | Hyprtasking | Raymond Bian and contributors | BSD-3-Clause | overview API/input behaviour reference; optional external plugin |
 | Qt (qtwayland private APIs) | The Qt Company and contributors | LGPL-3.0 / GPL-3.0 / commercial | optional `integrations/qt` prototype links against the user's own Qt; no Qt source is vendored |
+
+## User-contributed control symbols
+
+Close, minimize and fullscreen SVG symbols were contributed by Acrillate for Floatland. Original files are preserved in assets/icon-originals. The distributed close symbol uses equivalent plain SVG transforms for renderer portability; the other symbols retain the contributed geometry.
+
+## Lite 0.7.0
+
+Toolkit integrations and the external Hyprtasking installation path are removed from lite. References above document historical use; the native decoration attribution remains applicable. Lite retains the existing project license and all relevant notices.

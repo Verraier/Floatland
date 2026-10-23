@@ -1,7 +1,6 @@
 import unittest
 from floatland.ipc import Hyprland
 from floatland.geometry import Rect
-from floatland import overview
 try:
     from lupa import LuaRuntime
 except ImportError:
@@ -62,13 +61,8 @@ class TaskLuaTests(unittest.TestCase):
         self.assertIs(value.snap_palette,False)
         self.assertEqual(value.button_highlight,.3)
 
-    def test_switcher_preview_generation_is_forwarded(self):
-        self.ipc.prepare_switcher(19)
-        self.assertEqual(self.lua.globals().calls[1][1], 'prepare-tab')
-        self.assertEqual(self.lua.globals().calls[1][2], 19)
-
     def test_switcher_styles_are_validated(self):
-        for style in ('icons','preview','legacy'):
+        for style in ('icons',):
             self.ipc.configure_appearance({'tab_style':style,'tab_mouse':False,'tab_preview_width':280})
             self.assertEqual(self.lua.globals().appearance.tab_style,style)
             self.assertIs(self.lua.globals().appearance.tab_mouse,False)
@@ -120,14 +114,9 @@ class TaskLuaTests(unittest.TestCase):
 
     def test_toggle_poll_and_close_overview(self):
         self.lua.execute('overview_active = true')
+        self.lua.execute("hl.plugin.floatland.tick_ui = function() end")
         self.ipc.close_overview(); self.ipc.poll_overview()
         self.assertFalse(self.lua.globals().overview_active)
-
-    def test_overview_layout_lua(self):
-        overview.apply(self.ipc, {'layout':'linear','linear:top':1,'linear:height':280.0})
-        config = self.lua.globals().config.plugin.hyprtasking
-        self.assertEqual(config.linear.height, 280)
-        self.assertEqual(config.layout, 'linear')
 
     def test_appearance_reaches_native_with_defaults(self):
         self.ipc.configure_appearance({'snap_color':'#123abc','tab_icon_size':64})
@@ -135,3 +124,25 @@ class TaskLuaTests(unittest.TestCase):
         self.assertEqual(appearance.snap_color, '#123abc')
         self.assertEqual(appearance.tab_icon_size, 64)
         self.assertEqual(appearance.titlebar_opacity, 1)
+
+    def test_focus_keeps_cursor_without_dispatching_when_native_handles_it(self):
+        self.ipc.query=lambda name:[self.w]
+        self.lua.execute('hl.plugin.floatland.focus=function(address,pid) focused={address,pid}; return true end; hl.dsp.focus=function() error("unexpected warp-capable dispatcher") end')
+        self.ipc.dispatch('focuswindow','address:0xabc')
+        self.assertEqual(self.lua.globals().focused[1],'0xabc')
+        self.assertEqual(self.lua.globals().focused[2],123)
+
+    def test_focus_legacy_fallback_when_native_declines(self):
+        self.ipc.query=lambda name:[self.w]
+        self.lua.execute('hl.plugin.floatland.focus=function() return false end; hl.dsp.focus=function(w) return w end')
+        self.ipc.dispatch('focuswindow','address:0xabc')
+        self.assertEqual(self.lua.globals().calls[1][1],'dispatch')
+
+    def test_settings_page_labels_flags_and_identity_are_encoded(self):
+        self.lua.execute('hl.plugin.floatland.menu_page=function(rows) menu_rows=rows end')
+        self.ipc.menu_page([{'label':'Test "window"','action':'rule-mini','address':'0xabc','pid':123,'checked':True}])
+        row=self.lua.globals().menu_rows[1]
+        self.assertEqual(row['label'],'Test "window"')
+        self.assertEqual(row['pid'],123)
+        self.assertTrue(row['checked'])
+        self.assertTrue(row['check'])

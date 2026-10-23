@@ -12,8 +12,9 @@ import sys
 from .ipc import lua_string
 
 SECTIONS = {
+    'mini-titlebar': {'color': 'mini_color', 'opacity': 'mini_opacity', 'border_color': 'mini_border_color', 'border_opacity': 'mini_border_opacity', 'border_width': 'mini_border_width', 'width': 'mini_width', 'height': 'mini_height', 'button_size': 'mini_button_size', 'button_spacing': 'mini_button_spacing', 'offset': 'mini_offset', 'duration': 'mini_duration', 'timeout': 'mini_timeout'},
     'windows': None,
-    'titlebars': {'enabled':'titlebars_enabled','color':'titlebar_color','opacity':'titlebar_opacity',
+    'titlebars': {'menu_color':'menu_color','menu_opacity':'menu_opacity','menu_delay':'menu_delay','menu_hover':'menu_hover','focus_keep_cursor':'focus_keep_cursor','focus_click_only':'focus_click_only','enabled':'titlebars_enabled','color':'titlebar_color','opacity':'titlebar_opacity',
                  'text_color':'titlebar_text_color','font_size':'titlebar_font_size',
                  'close_color':'close_color','minimize_color':'minimize_color','maximize_color':'maximize_color',
                  'button_size':'button_size','button_spacing':'button_spacing','button_shift':'button_shift','button_stretch':'button_stretch',
@@ -21,17 +22,30 @@ SECTIONS = {
                  'buttons_side':'buttons_side','buttons_order':'buttons_order','title_alignment':'title_alignment',
                  'title_enabled':'title_enabled','highlight':'button_highlight','growth':'button_growth',
                  'hinting':'button_hinting','icons':'button_icons','hover_only':'button_hover_only'},
-    'snapping': {'enabled':'snap_enabled','color':'snap_color','opacity':'snap_opacity','duration':'snap_duration','palette':'snap_palette','edges':'snap_edges','preview':'snap_preview'},
+    'snapping': {'edge_resistance':'edge_resistance','enabled':'snap_enabled','color':'snap_color','opacity':'snap_opacity','duration':'snap_duration','palette':'snap_palette','edges':'snap_edges','preview':'snap_preview'},
     'overview': {'enabled':'overview_enabled','blur':'overview_blur','color':'overview_color','opacity':'overview_opacity',
                  'enter_duration':'overview_enter_duration','exit_duration':'overview_exit_duration'},
     'switching': {'enabled':'switching_enabled','color':'tab_color','opacity':'tab_opacity',
                   'font_size':'tab_font_size','icon_size':'tab_icon_size',
                   'style':'tab_style','mouse':'tab_mouse','preview_width':'tab_preview_width',
                   'enter_duration':'tab_enter_duration','exit_duration':'tab_exit_duration'},
-    'bindings': {'enabled':'bindings_enabled','alt_tab_key':'alt_tab_key','overview_key':'overview_key'},
+    'bindings': {'menu_key':'menu_key','enabled':'bindings_enabled','alt_tab_key':'alt_tab_key','overview_key':'overview_key'},
     'theme': {'titlebar':'titlebar_color','text':'titlebar_text_color','snap':'snap_color','switching':'tab_color','overview':'overview_color'},
     'experimental': {},
 }
+SECTIONS['titlebar-buttons'] = {k:v for k,v in SECTIONS['titlebars'].items() if k in (
+    'button_size','button_spacing','button_shift','button_stretch','return_duration','rebound','texture',
+    'buttons_side','buttons_order','close_color','minimize_color','maximize_color','highlight','growth','hinting','icons','hover_only')}
+SECTIONS['titlebar-buttons'].update({k:k for k in ('close_icon_scale','minimize_icon_scale','maximize_icon_scale','close_icon','minimize_icon','maximize_icon','icon_size','icon_tint','button_shadow','button_glow')})
+SECTIONS['mini-titlebar-buttons'] = {'button_size':'mini_button_size','button_spacing':'mini_button_spacing','texture':'mini_button_texture'}
+SECTIONS['mini-titlebar-buttons'].update({k:'mini_'+k for k in ('close_icon_scale','minimize_icon_scale','maximize_icon_scale','close_color','minimize_color','maximize_color','close_icon','minimize_icon','maximize_icon','icon_size','icon_tint','button_shadow','button_glow')})
+SECTIONS['capsule'] = dict(SECTIONS['mini-titlebar'], blur='mini_blur', enabled='titlebars_enabled', side='buttons_side', menu_color='menu_color', menu_opacity='menu_opacity', menu_delay='menu_delay', menu_hover='menu_hover', focus_keep_cursor='focus_keep_cursor', focus_click_only='focus_click_only')
+SECTIONS['buttons'] = dict(SECTIONS['mini-titlebar-buttons'], icons='button_icons',hover_only='button_hover_only',hinting='button_hinting',highlight='button_highlight',growth='button_growth',button_shift='button_shift',button_stretch='button_stretch',return_duration='button_return_duration',rebound='button_rebound')
+for legacy in ('titlebars','titlebar-buttons','mini-titlebar','mini-titlebar-buttons','experimental'):
+    SECTIONS.pop(legacy,None)
+SECTIONS['switching'].pop('style',None)
+SECTIONS['switching'].pop('preview_width',None)
+SECTIONS['theme'] = {'capsule':'mini_color','snap':'snap_color','switching':'tab_color','overview':'overview_color'}
 MARKER = '\x1eFLOATLAND_CONFIG\n'
 SERIALIZER = r'''
 local function encode(v, seen)
@@ -72,7 +86,7 @@ end
 
 
 def config_home():
-    return Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home()/'.config'))) / 'floatland'
+    return Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home()/'.config'))) / 'floatland-lite'
 
 
 def runtime():
@@ -94,6 +108,7 @@ def read_lua(path):
                'return assert(loadfile(path))() end\n' + SERIALIZER + '\n' +
                'local value=assert(loadfile(' + lua_string(str(path)) + '))()\n' +
                'assert(type(value)=="table", "init.lua must return a table")\n' +
+               ('for _,name in ipairs({"capsule","buttons"}) do if value[name]==nil then value[name]=section(name) end end\n' if path.name == 'init.lua' else '') +
                'io.write(' + lua_string(MARKER) + ',encode(value,{}))\n')
     try:
         result = subprocess.run(runtime(), input=program, text=True, capture_output=True, timeout=5)
@@ -229,7 +244,15 @@ def initialize(root):
     """Publish init.lua last; never replace user files or remove legacy JSON."""
     from .config import validate
     root = Path(root)
-    if (root/'init.lua').exists(): return
+    templates=Path(__file__).with_name('defaults')
+    for icon in (templates/'icons').rglob('*.svg'):
+        destination=root/icon.relative_to(templates)
+        destination.parent.mkdir(parents=True,exist_ok=True)
+        try:
+            with destination.open('xb') as output: output.write(icon.read_bytes())
+        except FileExistsError: pass
+    if (root/'init.lua').exists():
+        return
     runtime()  # Check dependencies before creating files.
     templates = Path(__file__).with_name('defaults')
     legacy = root/'config.json'
@@ -248,7 +271,7 @@ def initialize(root):
             if name not in ('windows', 'theme'):
                 shared = set(SECTIONS['theme'].values())
                 data = {key:value for key,value in data.items() if mapping[key] not in shared}
-            if name == 'titlebars' and 'buttons_order' in data:
+            if name in ('titlebars','titlebar-buttons') and 'buttons_order' in data:
                 data['buttons_order'] = data['buttons_order'].split(',') if data['buttons_order'] else []
             text = '-- Migrated from config.json; original JSON preserved.\n' + documented_table(text, data)
         try:
@@ -262,6 +285,8 @@ def initialize(root):
 def load_lua(path=None, create=False):
     path = Path(path) if path is not None else config_home()/'init.lua'
     if path.is_dir(): path = path/'init.lua'
+    if create and path.name == 'init.lua' and path.exists():
+        initialize(path.parent)
     if create and not path.exists():
         if path.name != 'init.lua': raise ValueError('New configuration entry must be named init.lua')
         initialize(path.parent)

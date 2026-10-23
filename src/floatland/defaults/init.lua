@@ -1,12 +1,11 @@
--- Floatland: user configuration. Missing section files use built-in defaults.
--- Each file returns a Lua table. Reload with: python3 run.py reload
+-- Floatland lite: edit these files live; no compilation needed.
 return {
     windows = section("windows"),
-    titlebars = section("titlebars"),
+    capsule = section("capsule"),
+    buttons = section("buttons"),
     snapping = section("snapping"),
     overview = section("overview"),
     switching = section("switching"),
     bindings = section("bindings"),
     theme = section("theme"),
-    experimental = section("experimental"),
 }

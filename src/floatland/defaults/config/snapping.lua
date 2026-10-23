@@ -1,5 +1,7 @@
+-- Edge resistance is temporarily suspended in 0.6.11e3; stored values are ignored.
 -- Edge snapping and the top palette. Commands such as "snap left" remain available.
 return {
+    edge_resistance = 0, -- Logical pixels of resistance before dragging past a work-area edge; 0 disables.
     enabled = true, -- Enable snapping while dragging a titlebar.
     edges = true, -- Detect screen edges and corners.
     palette = true, -- Show and activate the layout choices near the top of the screen.

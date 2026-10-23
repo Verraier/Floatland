@@ -22,10 +22,13 @@ class LuaIPCTests(unittest.TestCase):
         ]
         for command, args, expected in cases:
             with self.subTest(command=command, args=args):
-                with patch("floatland.ipc.exchange", return_value="ok") as transport:
+                with patch("floatland.ipc.exchange", return_value="ok") as transport, patch.object(Hyprland,"query",return_value=[{"address":"0xabc","pid":123}]):
                     Hyprland("/tmp").dispatch(command, args)
                 payload = transport.call_args.args[1]
-                self.assertTrue(payload.startswith('/eval local w = hl.get_window("address:0xabc");'))
+                if command=='focuswindow':
+                    self.assertIn('hl.plugin.floatland.focus("0xabc",123)',payload)
+                else:
+                    self.assertTrue(payload.startswith('/eval local w = hl.get_window("address:0xabc");'))
                 self.assertIn(expected, payload)
                 self.assertNotIn("/dispatch", payload)
 

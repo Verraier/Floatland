@@ -1,9 +1,7 @@
-# Нативная часть Floatland 0.5.0
+# Floatland Lite native plugin
 
-Обычный запуск из корня: `python3 run.py`. Отдельная установка не требуется.
-Hyprland 0.56.2, проверка ABI перед сборкой и загрузкой.
+Built automatically by `python3 run.py` on Linux with exact Hyprland 0.56.2 headers. The historical module name floatland-bars is retained.
 
-main.cpp/titlebar.cpp — заголовки, snap и restore.
-tasks.hpp — клавиатурный переключатель, панель задач и список свёрнутых.
-Полная сборка нового UI 0.5.0 на Linux здесь не проверена.
-Лицензия и происхождение: LICENSE, NOTICE.md, LICENSE.hyprbars.
+The plugin provides zero-reserved-height capsules, native drag handling and snap feedback, icons-only task switching, and snapshot thumbnails in a sidebar. It does not install renderWindow/renderFadeouts suppression hooks or inject toolkit controls. Snapshot capture and blur still use Hyprland rendering APIs and require Linux graphics validation.
+
+Run `python3 tools/check.py` from the project root for portable logic tests. See ../docs/linux-smoke-test.md for full runtime checks. Preserve LICENSE.hyprbars and the project NOTICE.md when redistributing.

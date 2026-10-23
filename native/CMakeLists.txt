@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(floatland_bars VERSION 0.6.7 LANGUAGES CXX)
+project(floatland_bars VERSION 0.7.0 LANGUAGES CXX)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "Build native titlebars on the Linux host running Hyprland 0.56.2")
 endif()
@@ -32,3 +32,12 @@ add_test(NAME overview-flow COMMAND overview-flow-test)
 add_executable(switcher-layout-test switcher_layout_test.cpp)
 target_compile_features(switcher-layout-test PRIVATE cxx_std_17)
 add_test(NAME switcher-layout COMMAND switcher-layout-test)
+
+add_executable(mini-state-test mini-state-test.cpp)
+target_compile_features(mini-state-test PRIVATE cxx_std_17)
+add_test(NAME mini-state COMMAND mini-state-test)
+
+
+add_executable(lite-layout-test lite-layout-test.cpp)
+target_compile_features(lite-layout-test PRIVATE cxx_std_17)
+add_test(NAME lite-layout COMMAND lite-layout-test)

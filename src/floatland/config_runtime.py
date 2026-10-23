@@ -20,6 +20,7 @@ def fingerprint(entry):
     files = {entry}
     if entry.suffix == '.lua':
         files.update(entry.parent.rglob('*.lua'))
+        files.update(entry.parent.rglob('*.svg'))
     digest = hashlib.sha256()
     for path in sorted(files):
         digest.update(str(path).encode())

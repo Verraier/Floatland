@@ -131,3 +131,13 @@ class BarsTests(unittest.TestCase):
         restarted.reconcile()
         self.assertEqual(restarted.mode('1'), 'tiling')
         self.assertFalse(self.ipc.clients[1]['floating'])
+
+    def test_shell_window_listing_and_addressed_action(self):
+        self.ipc.focus='0x1'
+        result=self.manager.command('windows')
+        self.assertEqual(result['api_version'],1)
+        self.assertEqual([w['address'] for w in result['windows']],['0x1','0x2'])
+        with self.assertRaises(ValueError): self.manager.command('close',target='0x2',pid=99)
+        self.assertEqual(len(self.ipc.clients),2)
+        self.manager.command('close',target='0x2',pid=2)
+        self.assertEqual([w['address'] for w in self.ipc.clients],['0x1'])

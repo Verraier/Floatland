@@ -27,13 +27,13 @@
 #include <format>
 
 #include "tasks.hpp"
-#include "overview-filter.hpp"
 
 using namespace Floatland;
 static std::vector<PHLWINDOWREF> pipWindows;
 bool isPictureInPicture(PHLWINDOW window) {
     return std::any_of(pipWindows.begin(),pipWindows.end(),[&](const auto& item) { return item.lock()==window; });
 }
+#include "window-menu.hpp"
 static HANDLE handle;
 static std::vector<FloatlandBar*> bars;
 static FloatlandBar* captured = nullptr;
@@ -66,7 +66,7 @@ static void clearSnap() {
     snapAlphaFrom=snapAlphaTo=0;
 }
 static void updateSnap(Point p, bool ownedRelease = false) {
-    if (captured && captured->owner() && captured->owner()->m_pinned) { clearSnap(); return; }
+    if (captured && (captured->owner() && captured->owner()->m_pinned)) { clearSnap(); return; }
     if (!Style::snapEnabled) { clearSnap(); return; }
     if (!ownedRelease && !draggingOurWindow()) { clearSnap(); return; }
     auto m=State::monitorState()->query().vec(Vector2D{p.x,p.y}).run();
@@ -125,6 +125,7 @@ class PalettePass : public IPassElement {
     ePassElementType type() override { return EK_CUSTOM; }
 };
 
+// Edge resistance is suspended: mutating layout from render hooks races the drag controller.
 static void endDrag() {
     clearSnap();
     if (ownedDrag) {
@@ -188,6 +189,51 @@ static int appearanceLua(lua_State* L) {
         if (!std::isfinite(v) || v<low || v>high) luaL_error(L,"invalid appearance number: %s",key);
         return v;
     };
+    std::array<double,3> next_miniColor; color("mini_color",next_miniColor);
+    const auto next_mini_blur=boolean("mini_blur");
+    const auto next_miniOpacity=number("mini_opacity",0,1);
+    std::array<double,3> next_miniBorderColor; color("mini_border_color",next_miniBorderColor);
+    const auto next_miniBorderOpacity=number("mini_border_opacity",0,1);
+    const auto next_miniBorderWidth=number("mini_border_width",0,4);
+    const auto next_miniWidth=number("mini_width",96,320);
+    const auto next_miniHeight=number("mini_height",28,64);
+    const auto next_miniButtonSize=number("mini_button_size",8,24);
+    const auto next_miniButtonSpacing=number("mini_button_spacing",0,40);
+    const auto next_miniOffset=number("mini_offset",0,32);
+    const auto next_miniDuration=number("mini_duration",0.035,0.5);
+    const auto next_focus_click_only=boolean("focus_click_only");
+    const auto next_focus_keep_cursor=boolean("focus_keep_cursor");
+    const auto next_menu_hover=boolean("menu_hover");
+    const auto next_menu_delay=number("menu_delay",0.2,10);
+    auto next_menuColor=Style::menuColor; color("menu_color",next_menuColor);
+    const auto next_menuOpacity=number("menu_opacity",0,1);
+    const auto next_edgeResistance=number("edge_resistance",0,80);
+    lua_getfield(L,1,"close_icon"); const std::string next_close_icon=luaL_checkstring(L,-1); lua_pop(L,1);
+    lua_getfield(L,1,"minimize_icon"); const std::string next_minimize_icon=luaL_checkstring(L,-1); lua_pop(L,1);
+    lua_getfield(L,1,"maximize_icon"); const std::string next_maximize_icon=luaL_checkstring(L,-1); lua_pop(L,1);
+    const auto next_close_icon_scale=number("close_icon_scale",0.5,1.5);
+    const auto next_mini_close_icon_scale=number("mini_close_icon_scale",0.5,1.5);
+    const auto next_minimize_icon_scale=number("minimize_icon_scale",0.5,1.5);
+    const auto next_mini_minimize_icon_scale=number("mini_minimize_icon_scale",0.5,1.5);
+    const auto next_maximize_icon_scale=number("maximize_icon_scale",0.5,1.5);
+    const auto next_mini_maximize_icon_scale=number("mini_maximize_icon_scale",0.5,1.5);
+    const auto next_icon_size=number("icon_size",0.2,0.9);
+    const auto next_icon_tint=boolean("icon_tint");
+    const auto next_button_shadow=number("button_shadow",0,1);
+    const auto next_button_glow=number("button_glow",0,1);
+    lua_getfield(L,1,"mini_close_icon"); const std::string next_mini_close_icon=luaL_checkstring(L,-1); lua_pop(L,1);
+    lua_getfield(L,1,"mini_minimize_icon"); const std::string next_mini_minimize_icon=luaL_checkstring(L,-1); lua_pop(L,1);
+    lua_getfield(L,1,"mini_maximize_icon"); const std::string next_mini_maximize_icon=luaL_checkstring(L,-1); lua_pop(L,1);
+    const auto next_mini_icon_size=number("mini_icon_size",0.2,0.9);
+    const auto next_mini_icon_tint=boolean("mini_icon_tint");
+    const auto next_mini_button_shadow=number("mini_button_shadow",0,1);
+    const auto next_mini_button_glow=number("mini_button_glow",0,1);
+    auto next_mini_close_color=Style::mini_close_color; color("mini_close_color",next_mini_close_color);
+    auto next_mini_minimize_color=Style::mini_minimize_color; color("mini_minimize_color",next_mini_minimize_color);
+    auto next_mini_maximize_color=Style::mini_maximize_color; color("mini_maximize_color",next_mini_maximize_color);
+    const auto next_mini_button_texture=boolean("mini_button_texture");
+    const auto next_menuKey=number("menu_key",1,255);
+    const auto next_miniTimeout=number("mini_timeout",0.5,30);
     std::array<double,3> next_titlebar; color("titlebar_color",next_titlebar);
     const auto next_titlebarOpacity=number("titlebar_opacity",0,1);
     std::array<double,3> next_snap; color("snap_color",next_snap);
@@ -247,12 +293,25 @@ static int appearanceLua(lua_State* L) {
     const auto next_snap_preview=boolean("snap_preview");
     if (!validButtonOrder(next_buttons_order)) return luaL_error(L,"invalid buttons_order");
     const auto next_tab_style=textValue("tab_style");
-    if(next_tab_style!="icons" && next_tab_style!="preview" && next_tab_style!="legacy")
+    if(next_tab_style!="icons")
         return luaL_error(L,"invalid tab_style");
     const auto next_tab_mouse=boolean("tab_mouse");
     const auto next_tab_preview_width=number("tab_preview_width",160,360);
     if(std::floor(next_tab_preview_width)!=next_tab_preview_width) return luaL_error(L,"preview_width must be an integer");
     // Commit only after every field has passed validation.
+    Style::miniColor=next_miniColor;
+    Style::mini_blur=next_mini_blur;
+    Style::miniOpacity=next_miniOpacity;
+    Style::miniBorderColor=next_miniBorderColor;
+    Style::miniBorderOpacity=next_miniBorderOpacity;
+    Style::miniBorderWidth=next_miniBorderWidth;
+    Style::miniWidth=next_miniWidth;
+    Style::miniHeight=next_miniHeight;
+    Style::miniButtonSize=next_miniButtonSize;
+    Style::miniButtonSpacing=next_miniButtonSpacing;
+    Style::miniOffset=next_miniOffset;
+    Style::miniDuration=next_miniDuration;
+    Style::miniTimeout=next_miniTimeout;
     Style::titlebar=next_titlebar;
     Style::titlebarOpacity=next_titlebarOpacity;
     Style::snap=next_snap;
@@ -293,6 +352,37 @@ static int appearanceLua(lua_State* L) {
     Style::title_alignment=next_title_alignment;
     Style::title_enabled=next_title_enabled;
     Style::button_highlight=next_button_highlight;
+    Style::focus_click_only=next_focus_click_only;
+    Style::focus_keep_cursor=next_focus_keep_cursor;
+    Style::menu_hover=next_menu_hover;
+    Style::menu_delay=next_menu_delay;
+    Style::menuColor=next_menuColor; Style::menuOpacity=next_menuOpacity;
+    Style::edgeResistance=next_edgeResistance;
+    Style::close_icon=next_close_icon;
+    Style::minimize_icon=next_minimize_icon;
+    Style::maximize_icon=next_maximize_icon;
+    Style::close_icon_scale=next_close_icon_scale;
+    Style::mini_close_icon_scale=next_mini_close_icon_scale;
+    Style::minimize_icon_scale=next_minimize_icon_scale;
+    Style::mini_minimize_icon_scale=next_mini_minimize_icon_scale;
+    Style::maximize_icon_scale=next_maximize_icon_scale;
+    Style::mini_maximize_icon_scale=next_mini_maximize_icon_scale;
+    Style::icon_size=next_icon_size;
+    Style::icon_tint=next_icon_tint;
+    Style::button_shadow=next_button_shadow;
+    Style::button_glow=next_button_glow;
+    Style::mini_close_icon=next_mini_close_icon;
+    Style::mini_minimize_icon=next_mini_minimize_icon;
+    Style::mini_maximize_icon=next_mini_maximize_icon;
+    Style::mini_icon_size=next_mini_icon_size;
+    Style::mini_icon_tint=next_mini_icon_tint;
+    Style::mini_button_shadow=next_mini_button_shadow;
+    Style::mini_button_glow=next_mini_button_glow;
+    Style::mini_close_color=next_mini_close_color;
+    Style::mini_minimize_color=next_mini_minimize_color;
+    Style::mini_maximize_color=next_mini_maximize_color;
+    Style::mini_button_texture=next_mini_button_texture;
+    Style::menuKey=static_cast<int>(next_menuKey);
     Style::button_growth=next_button_growth;
     Style::button_hinting=next_button_hinting;
     Style::button_icons=next_button_icons;
@@ -325,7 +415,7 @@ static void refresh(PHLWINDOW w) {
     for (auto* bar : bars) if (bar->owner() == w) bar->updateWindow(w);
     g_pDecorationPositioner->onWindowUpdate(w);
 }
-static FloatlandBar* hit(Point point) {
+static PHLWINDOW contentOwner(Point point) {
     if (g_pSessionLockManager->isSessionLocked() || g_pInputManager->isConstrained()) return nullptr;
     const Vector2D p{point.x, point.y};
     auto monitor = State::monitorState()->query().vec(p).run();
@@ -346,9 +436,14 @@ static FloatlandBar* hit(Point point) {
     if (!w->wlSurface() || !w->wlSurface()->resource()) return nullptr;
     if (g_pSeatManager->m_seatGrab && !g_pSeatManager->m_seatGrab->accepts(w->wlSurface()->resource()))
         return nullptr;
-    refresh(w);
+    return w;
+}
+static FloatlandBar* hit(Point point, bool activation=false, bool sync=true) {
+    const auto w=contentOwner(point);
+    if(!w) return nullptr;
+    if(sync) refresh(w);
     for (auto* bar : bars)
-        if (bar->owner() == w && bar->visible() && bar->globalBox().contains(point)) return bar;
+        if (bar->owner() == w && bar->pointerHit(point,activation)) return bar;
     return nullptr;
 }
 static void action(FloatlandBar* bar, Control control) {
@@ -419,7 +514,7 @@ static void restoreDuringDrag(Point pointer) {
     }
     const auto area = monitor->m_reservedArea.apply(CBox{monitor->m_position, monitor->m_size});
     const auto rect = restoredDragRect(pointer, size, dragGrip,
-        {area.x, area.y + HEIGHT, area.w, std::max(1.0, area.h - HEIGHT)});
+        {area.x, area.y, area.w, area.h});
     // Restart the compositor's drag origin after an atomic resize, otherwise the
     // next mouse delta would reapply its cached snapped size and position.
     g_layoutManager->dragController()->dragEnd();
@@ -430,9 +525,19 @@ static void restoreDuringDrag(Point pointer) {
     g_layoutManager->dragController()->dragBegin(target, MBIND_MOVE, std::nullopt, true);
     dragEvent(w, "drag-restored", rectPayload(CBox{rect.x, rect.y, rect.w, rect.h}));
 }
+static bool focusRelease=false;
+static PHLWINDOWREF hoverMenuWindow;
+static double hoverMenuSince=0;
+static bool hoverMenuOpened=false;
 static void mouseButton(IPointer::SButtonEvent e, Event::SCallbackInfo& info) {
+    // Match the swallowed press even if its window closes before release.
+    if(e.button==272 && e.state==WL_POINTER_BUTTON_STATE_RELEASED && focusRelease) {
+        focusRelease=false; info.cancelled=true; return;
+    }
+    hoverMenuWindow.reset(); hoverMenuOpened=false;
+    if (WindowMenu::button(e,info)) return;
     if (TaskUI::button(e, info)) return;
-    // Consume both sides of a right click before toggling PiP.
+    // Consume both sides of the context-menu or mini-mode escape gesture.
     static bool pipRelease = false;
     if (e.button == 273) {
         if (e.state == WL_POINTER_BUTTON_STATE_RELEASED && pipRelease) {
@@ -440,8 +545,8 @@ static void mouseButton(IPointer::SButtonEvent e, Event::SCallbackInfo& info) {
         }
         if (e.state == WL_POINTER_BUTTON_STATE_PRESSED && !info.cancelled && !consumeRelease) {
             const auto p = g_pInputManager->getMouseCoordsInternal();
-            if (auto* bar = hit({p.x,p.y})) {
-                dragEvent(bar->owner(), "pip");
+            if (auto* bar = hit({p.x,p.y},true)) {
+                WindowMenu::show(bar->owner(),{p.x,p.y});
                 pipRelease = true; info.cancelled = true;
             }
         }
@@ -504,7 +609,21 @@ static void mouseButton(IPointer::SButtonEvent e, Event::SCallbackInfo& info) {
     if (e.state != WL_POINTER_BUTTON_STATE_PRESSED || info.cancelled || consumeRelease) return;
     if (g_layoutManager->dragController()->target()) return;
     auto* bar = hit(point);
-    if (!bar) return;
+    if (!bar) {
+        auto w=contentOwner(point);
+        if(Style::focus_click_only && !g_pInputManager->getModsFromAllKBs() && w && w->m_isFloating && !w->isX11OverrideRedirect() &&
+           Desktop::focusState()->window()!=w) {
+            Desktop::focusState()->fullWindowFocus(w,Desktop::FOCUS_REASON_CLICK);
+            if(Desktop::focusState()->window()==w) {
+                Desktop::windowState()->raise(w); focusRelease=true; info.cancelled=true;
+            }
+        }
+        return;
+    }
+    if(bar->controlAt(point)==Control::None && !bar->gripHit(point)) {
+        // The indicator and empty capsule space never activate controls or drag.
+        focusRelease=true; info.cancelled=true; return;
+    }
     info.cancelled = true; // Both press and release bypass client delivery.
     consumeRelease = true;
     captured = bar;
@@ -519,8 +638,8 @@ static void mouseButton(IPointer::SButtonEvent e, Event::SCallbackInfo& info) {
     Desktop::focusState()->fullWindowFocus(bar->owner(), Desktop::FOCUS_REASON_CLICK);
     Desktop::windowState()->raise(bar->owner());
     if (click.pressed == Control::None) {
-        const auto box = bar->globalBox();
-        dragGrip = {(point.x - box.x) / std::max(1.0, box.w), point.y - box.y};
+        const auto windowBox=bar->owner()->layoutTarget()->position();
+        dragGrip = {(point.x-windowBox.x)/std::max(1.0,windowBox.w),point.y-windowBox.y};
         dragEvent(bar->owner(), "drag-start", rectPayload(bar->owner()->layoutTarget()->position()));
         g_layoutManager->dragController()->dragBegin(bar->owner()->layoutTarget(), MBIND_MOVE,
                                                      std::nullopt, true);
@@ -531,15 +650,10 @@ struct Listeners {
     CHyprSignalListener overviewPre, open, floating, fullscreen, rules, pin, workspace, render, button, move, lock, tasksKey, tasksAxis;
     Listeners() {
         overviewPre=Event::bus()->m_events.render.preChecks.listen([](PHLMONITOR m) {
-            OverviewFilter::restoreSolitary();
             TaskUI::prepareFrame(m);
-            if(OverviewFilter::suppress(g_pHyprRenderer.get(),m)) {
-                OverviewFilter::solitaryMonitor=m; OverviewFilter::savedSolitary=m->m_solitaryClient;
-                m->m_solitaryClient.reset();
-            }
         });
-        tasksKey = Event::bus()->m_events.input.keyboard.key.listen(TaskUI::key);
-        tasksAxis = Event::bus()->m_events.input.mouse.axis.listen(TaskUI::scroll);
+        tasksKey = Event::bus()->m_events.input.keyboard.key.listen([](IKeyboard::SKeyEvent e, Event::SCallbackInfo& info) { if(!WindowMenu::key(e,info)) TaskUI::key(e,info); });
+        tasksAxis = Event::bus()->m_events.input.mouse.axis.listen([](IPointer::SAxisEvent e, Event::SCallbackInfo& info) { if(!WindowMenu::scroll(e,info)) TaskUI::scroll(e,info); });
         open = Event::bus()->m_events.window.open.listen([](PHLWINDOW w) {
             // A newly mapped window is not part of the frozen overview scene.
             // Cancel instead of suppressing an application absent from its cards.
@@ -552,7 +666,9 @@ struct Listeners {
         pin = Event::bus()->m_events.window.pin.listen([](PHLWINDOW w) { refresh(w); });
         workspace = Event::bus()->m_events.window.moveToWorkspace.listen([](PHLWINDOW w, PHLWORKSPACE) { refresh(w); });
         render = Event::bus()->m_events.render.stage.listen([](eRenderStage stage) {
-            if(stage==RENDER_POST) OverviewFilter::restoreSolitary();
+            if (stage == RENDER_LAST_MOMENT && WindowMenu::valid() && !TaskUI::kind && !TaskUI::capturing)
+                g_pHyprRenderer->addPassElement(makeUnique<WindowMenu::Pass>());
+            if (TaskUI::kind && WindowMenu::owner.lock()) WindowMenu::hide();
             if (stage == RENDER_LAST_MOMENT && TaskUI::kind && !TaskUI::capturing)
                 g_pHyprRenderer->addPassElement(makeUnique<TaskUI::Pass>());
             if (stage == RENDER_POST_WINDOWS && draggingOurWindow())
@@ -563,7 +679,15 @@ struct Listeners {
         });
         button = Event::bus()->m_events.input.mouse.button.listen(mouseButton);
         move = Event::bus()->m_events.input.mouse.move.listen([](Vector2D p, Event::SCallbackInfo&) {
+            WindowMenu::pointer({p.x,p.y});
             TaskUI::pointerMove({p.x,p.y});
+            const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+            auto* activation=hit({p.x,p.y},true);
+            if(!activation || activation->controlAt({p.x,p.y})!=Control::Maximize ||
+               activation->owner()!=hoverMenuWindow.lock()) {
+                hoverMenuWindow.reset(); hoverMenuOpened=false;
+            }
+            for(auto* bar:bars) bar->tickMini(seconds,bar==activation,(captured==bar && click.active) || (WindowMenu::valid() && WindowMenu::owner.lock()==bar->owner()));
             if (captured && click.active && click.pressed != Control::None) {
                 captured->pressOffset = buttonPull({p.x-click.origin.x,p.y-click.origin.y});
                 captured->damageEntire();
@@ -578,6 +702,7 @@ struct Listeners {
             }
         });
         lock = g_pSessionLockManager->m_events.lock.listen([] {
+            WindowMenu::hide();
             TaskUI::reset();
             TaskUI::emit("cancel");
             if (captured) dragEvent(captured->owner(), "drag-end");
@@ -599,11 +724,43 @@ static int pictureInPictureLua(lua_State* L) {
     resyncBars();
     return 0;
 }
+static int focusLua(lua_State* L) {
+    if(!Style::focus_keep_cursor) { lua_pushboolean(L,false); return 1; }
+    auto w=TaskUI::find(luaL_checkstring(L,1),luaL_checkinteger(L,2));
+    if(!w || g_pSessionLockManager->isSessionLocked()) return luaL_error(L,"Focus target unavailable");
+    if(!w->m_isFloating) { lua_pushboolean(L,false); return 1; }
+    Desktop::focusState()->fullWindowFocus(w,Desktop::FOCUS_REASON_CLICK);
+    lua_pushboolean(L,true); return 1;
+}
+static int windowMenuLua(lua_State* L) {
+    auto w=TaskUI::find(luaL_checkstring(L,1),luaL_checkinteger(L,2));
+    if(!w || g_pSessionLockManager->isSessionLocked()) return luaL_error(L,"Menu target unavailable");
+    const auto p=g_pInputManager->getMouseCoordsInternal();
+    WindowMenu::show(w,{p.x,p.y}); return 0;
+}
+static int tickUiLua(lua_State*) {
+
+    const auto p=g_pInputManager->getMouseCoordsInternal();
+    auto* over=hit({p.x,p.y},true,false);
+    const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    for(auto* bar:bars) bar->tickMini(seconds,bar==over,(captured==bar && click.active) || (WindowMenu::valid() && WindowMenu::owner.lock()==bar->owner()));
+    const auto candidate=Style::menu_hover && !TaskUI::kind && !click.active && over &&
+        over->controlAt({p.x,p.y})==Control::Maximize ? over->owner() : nullptr;
+    if(candidate!=hoverMenuWindow.lock()) {
+        hoverMenuWindow=candidate; hoverMenuSince=seconds; hoverMenuOpened=false;
+    }
+    if(candidate && !hoverMenuOpened && !WindowMenu::valid() && seconds-hoverMenuSince>=Style::menu_delay) {
+        hoverMenuOpened=true; WindowMenu::show(candidate,{p.x,p.y+12});
+    }
+    if(WindowMenu::monitor.lock() && !WindowMenu::valid()) WindowMenu::hide();
+    return 0;
+}
 APICALL EXPORT std::string PLUGIN_API_VERSION() { return HYPRLAND_API_VERSION; }
 APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     handle = h;
     TaskUI::reset();
     pipWindows.clear();
+    WindowMenu::hide();
     captured = nullptr;
     click = {};
     ownedDrag = consumeRelease = movedDuringPress = restoredDuringDrag = false;
@@ -612,14 +769,17 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     snapMonitor.reset();
     if (std::string(__hyprland_api_get_hash()) != std::string(__hyprland_api_get_client_hash()))
         throw std::runtime_error("Floatland titlebars: compositor/header ABI mismatch; rebuild for installed Hyprland");
-    if (!HyprlandAPI::addLuaFunction(handle, "floatland", "pip", pictureInPictureLua) ||
+    if (!HyprlandAPI::addLuaFunction(handle, "floatland", "menu_page", WindowMenu::pageLua) ||
+        !HyprlandAPI::addLuaFunction(handle, "floatland", "focus", focusLua) ||
+        !HyprlandAPI::addLuaFunction(handle, "floatland", "window_menu", windowMenuLua) ||
+        !HyprlandAPI::addLuaFunction(handle, "floatland", "tick_ui", tickUiLua) ||
+        !HyprlandAPI::addLuaFunction(handle, "floatland", "pip", pictureInPictureLua) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "appearance", appearanceLua) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "geometry", geometryLua) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "restore_size", restoreSizeLua) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "refresh", refreshLua))
         throw std::runtime_error("Floatland: could not register geometry bridge");
     if (!HyprlandAPI::addLuaFunction(handle, "floatland", "tasks", TaskUI::show) ||
-        !HyprlandAPI::addLuaFunction(handle, "floatland", "prepare_tab", TaskUI::prepareTab) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "prepare_overview", TaskUI::prepareOverview) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "selection_valid", TaskUI::selectionValid) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "finish_selection", TaskUI::finishSelection) ||
@@ -627,14 +787,14 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
         !HyprlandAPI::addLuaFunction(handle, "floatland", "overview_active", TaskUI::overviewState) ||
         !HyprlandAPI::addLuaFunction(handle, "floatland", "raise_window", TaskUI::raiseWindow))
         throw std::runtime_error("Floatland task UI registration failed");
-    OverviewFilter::install(handle);
     try { listeners = makeUnique<Listeners>(); resyncBars(); }
-    catch(...) { listeners.reset(); OverviewFilter::remove(handle); throw; }
-    return {"floatland-bars", "Native floating titlebars with shared render/input geometry", "Floatland / Hypr Development", "0.6.7"};
+    catch(...) { listeners.reset(); throw; }
+    return {"floatland-bars", "Native floating titlebars with shared render/input geometry", "Floatland / Hypr Development", "0.7.0-lite3"};
 }
 APICALL EXPORT void PLUGIN_EXIT() {
+    WindowMenu::hide();
+    g_pHyprRenderer->m_renderPass.removeAllOfType("FloatlandWindowMenuPass");
     TaskUI::reset();
-    OverviewFilter::remove(handle);
     listeners.reset();
     TaskUI::reset();
     g_pHyprRenderer->m_renderPass.removeAllOfType("FloatlandTaskPass");

@@ -25,33 +25,52 @@ class LuaConfigTests(unittest.TestCase):
     def write(self, section, text):
         (self.root/'config'/(section+'.lua')).write_text(text)
 
+    def test_capsule_settings_are_live_and_preserved(self):
+        load(self.entry,create=True)
+        original=self.entry.read_bytes()
+        self.write('capsule','return {width=180,height=44,opacity=.5,duration=.2}')
+        appearance=load(self.entry,create=True)['appearance']
+        self.assertEqual(self.entry.read_bytes(),original)
+        self.assertEqual(appearance['mini_width'],180)
+        self.assertEqual(appearance['mini_height'],44)
+        self.write('capsule','return {opacity=2}')
+        with self.assertRaisesRegex(ValueError,'capsule'): load(self.entry)
+
+
+    def test_optical_symbol_sizes_are_independent_and_bounded(self):
+        load(self.entry,create=True)
+        self.write('buttons','return {close_icon_scale=1.3,maximize_icon_scale=.8}')
+        a=load(self.entry)['appearance']
+        self.assertEqual(a['mini_close_icon_scale'],1.3)
+        self.assertEqual(a['mini_maximize_icon_scale'],.8)
+        self.assertEqual(a['mini_button_size'],14)
+        self.write('buttons','return {close_icon_scale=20}')
+        with self.assertRaises(ValueError): load(self.entry)
+
+
     def test_button_diameter_roundtrip(self):
         load(self.entry, create=True)
-        self.write('titlebars', 'return { button_size=18, button_spacing=4 }')
+        self.write('buttons', 'return { button_size=18, button_spacing=4 }')
         settings = load(self.entry)['appearance']
-        self.assertEqual(settings['button_size'],18)
-        self.assertEqual(settings['button_spacing'],4)
+        self.assertEqual(settings['mini_button_size'],18)
+        self.assertEqual(settings['mini_button_spacing'],4)
 
     def test_init_default_sections_and_theme_precedence(self):
         settings = load(self.entry, create=True)
         self.assertEqual(settings['appearance'], APPEARANCE)
-        self.write('theme', 'return { titlebar="#123456", overview="#abcdef" }')
-        self.write('titlebars', 'return { opacity=.8 }')
-        self.assertEqual(load(self.entry)['appearance']['titlebar_color'], '#123456')
-        self.write('titlebars', 'return { color="#654321" }')
-        self.assertEqual(load(self.entry)['appearance']['titlebar_color'], '#654321')
+        self.write('theme', 'return { capsule="#123456", overview="#abcdef" }')
+        self.write('capsule', 'return { opacity=.8 }')
+        self.assertEqual(load(self.entry)['appearance']['mini_color'], '#123456')
+        self.write('capsule', 'return { color="#654321" }')
+        self.assertEqual(load(self.entry)['appearance']['mini_color'], '#654321')
 
-    def test_button_layout_is_explicit_and_validated(self):
+    def test_capsule_corner_is_validated(self):
         load(self.entry,create=True)
-        self.write('titlebars', 'return {buttons_side="left", buttons_order={"close","minimize"}, title_alignment="center", highlight=.3}')
-        settings=load(self.entry)['appearance']
-        self.assertEqual(settings['buttons_order'],'close,minimize')
-        self.assertEqual(settings['buttons_side'],'left')
-        for order in ('{"close","close"}', '{"unknown"}', '"close,minimize"'):
-            self.write('titlebars','return {buttons_order='+order+'}')
-            with self.assertRaisesRegex(ValueError,'buttons_order'): load(self.entry)
-        self.write('titlebars','return {buttons_order={}}')
-        self.assertEqual(load(self.entry)['appearance']['buttons_order'],'')
+        self.write('capsule','return {side="right"}')
+        self.assertEqual(load(self.entry)['appearance']['buttons_side'],'right')
+        self.write('capsule','return {side="outside"}')
+        with self.assertRaises(ValueError): load(self.entry)
+
 
     def test_new_json_migration_leaves_theme_colors_editable(self):
         (self.root/'config.json').write_text('{"appearance":{"snap_color":"#123456"}}')
@@ -78,12 +97,12 @@ class LuaConfigTests(unittest.TestCase):
         self.assertEqual(value['workspace_modes'], {'2':'tiling'})
 
     def test_migration_preserves_json_and_values(self):
-        legacy={'gap':17,'exclude_classes':['kitty'], 'appearance':{'titlebar_color':'#445566','tab_font_size':18}}
+        legacy={'gap':17,'exclude_classes':['kitty'], 'appearance':{'mini_color':'#445566','tab_font_size':18}}
         original=json.dumps(legacy)
         (self.root/'config.json').write_text(original)
         value=load(self.entry,create=True)
         self.assertEqual(value['gap'],17)
-        self.assertEqual(value['appearance']['titlebar_color'],'#445566')
+        self.assertEqual(value['appearance']['mini_color'],'#445566')
         self.assertEqual(value['appearance']['tab_font_size'],18)
         self.assertEqual((self.root/'config.json').read_text(),original)
         before={p:p.read_bytes() for p in self.root.rglob('*.lua')}
@@ -97,7 +116,7 @@ class LuaConfigTests(unittest.TestCase):
 
     def test_migration_does_not_merge_over_existing_lua(self):
         (self.root/'config').mkdir()
-        self.write('theme','return {titlebar="#111111"}')
+        self.write('theme','return {capsule="#111111"}')
         (self.root/'config.json').write_text('{}')
         with self.assertRaisesRegex(ValueError,'migration refused'): initialize(self.root)
         self.assertFalse(self.entry.exists())
@@ -107,7 +126,7 @@ class LuaConfigTests(unittest.TestCase):
         for section,text,error in [('overview','return {blur="false"}','overview.lua'),
                                     ('theme','return {snap="red"}','theme.lua'),
                                     ('bindings','return {alt_tab_key=56}','bindings.lua'),
-                                    ('titlebars','return {typo=1}','titlebars.lua')]:
+                                    ('capsule','return {typo=1}','capsule.lua')]:
             with self.subTest(section=section):
                 old=(self.root/'config'/(section+'.lua')).read_text()
                 self.write(section,text)
@@ -141,6 +160,22 @@ class LuaConfigTests(unittest.TestCase):
         result=subprocess.run(command,cwd='/tmp',env=env,capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertTrue(self.entry.exists())
+
+
+    def test_user_svg_survives_reload(self):
+        load(self.entry,create=True)
+        self.write('buttons','return {button_glow=.7,close_icon="icons/custom.svg",button_size=18}')
+        icon=self.root/'icons/mini/close.svg';icon.write_text('<svg>custom</svg>')
+        a=load(self.entry,create=True)['appearance']
+        self.assertEqual(a['mini_button_glow'],.7)
+        self.assertEqual(a['mini_button_size'],18)
+        self.assertEqual(a['mini_close_icon'],'icons/custom.svg')
+        self.assertEqual(icon.read_text(),'<svg>custom</svg>')
+
+
+    def test_legacy_init_is_not_silently_used_as_lite(self):
+        self.entry.write_text('return {titlebars={}}')
+        with self.assertRaisesRegex(ValueError,'expected sections'): load(self.entry)
 
 
 class ReloadTests(unittest.TestCase):

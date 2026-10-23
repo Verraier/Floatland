@@ -13,7 +13,7 @@ from .config_runtime import ConfigRuntime
 
 LOG = logging.getLogger("floatland")
 EVENTS = {"openwindow", "closewindow", "movewindowv2", "workspacev2",
-          "monitoraddedv2", "monitorremoved", "configreloaded", "fullscreen"}
+          "windowtitlev2", "monitoraddedv2", "monitorremoved", "configreloaded", "fullscreen"}
 
 
 async def run(directory, config, config_path=None, unified=False):
@@ -31,7 +31,8 @@ async def run(directory, config, config_path=None, unified=False):
         raise
     path = directory / "floatland.sock"
     stop = asyncio.Event()
-    controller = Controller(ipc, State(directory / "floatland-state.json"), config, SizeMemory())
+    from .lua_config import config_home
+    controller = Controller(ipc, State(directory / "floatland-state.json"), config, SizeMemory(), config_home()/"config"/"set-rules.json")
     configuration = ConfigRuntime(controller, config_path, native=unified)
     LOG.info("Active configuration: %s | automatic reload=%s", configuration.path, unified)
     loop = asyncio.get_running_loop()
@@ -52,7 +53,9 @@ async def run(directory, config, config_path=None, unified=False):
                 result = {"stopping": True}
                 stop.set()
             else:
-                result = controller.command(request["action"], request.get("value"))
+                if request.get("target") is not None and (not isinstance(request["target"],str) or type(request.get("pid")) is not int):
+                    raise ValueError("Addressed commands require target and integer pid")
+                result = controller.command(request["action"], request.get("value"),target=request.get("target"),pid=request.get("pid"))
             if request["action"] == "status":
                 result['config_path'] = str(configuration.path)
                 result['native_settings'] = unified
@@ -101,9 +104,7 @@ async def run(directory, config, config_path=None, unified=False):
                     if event == 'floatland_tasks':
                         try:
                             parts = payload.split(',')
-                            if parts[0] == 'prepare-tab' and len(parts) == 2:
-                                ipc.prepare_switcher(int(parts[1]))
-                            elif parts[0] == 'step' and len(parts) == 4:
+                            if parts[0] == 'step' and len(parts) == 4:
                                 controller.tasks.next_from(parts[1], int(parts[2]), parts[3] == '1')
                             elif parts[0] == 'prepare' and len(parts) == 2:
                                 ipc.prepare_overview(int(parts[1]))
@@ -151,13 +152,17 @@ async def run(directory, config, config_path=None, unified=False):
             await asyncio.sleep(.25)
 
     async def size_watch():
+        last_error=None
         while not stop.is_set():
             await asyncio.sleep(1)
-            if controller.config.get("remember_sizes", True):
-                try:
-                    controller.refresh()
-                except (OSError, IPCError, ValueError) as error:
-                    LOG.warning("Size sampling failed: %s", error)
+            try:
+                controller.refresh()
+                controller.rules.apply(controller)
+                last_error=None
+            except (OSError, IPCError, ValueError) as error:
+                if str(error)!=last_error:
+                    LOG.warning("Window state sampling failed: %s", error)
+                    last_error=str(error)
 
     def task_finished(task):
         if task.cancelled():

@@ -14,7 +14,7 @@ class FormatTests(unittest.TestCase):
             text = (root / 'config/switching.lua').read_text()
             self.assertIn('icon_size = 92,', text)
             self.assertIn('Panel opacity:', text)
-            self.assertIn('Maximum preview card width', text)
+            self.assertNotIn('preview_width', text)
             self.assertEqual(load_lua(root / 'init.lua')['appearance']['tab_opacity'], .7)
 
     def test_old_generated_file_reformatted_without_effective_changes(self):

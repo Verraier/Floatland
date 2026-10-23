@@ -19,8 +19,10 @@ def identity(client):
 
 
 class Controller:
-    def __init__(self, ipc, state, config, size_memory=None):
+    def __init__(self, ipc, state, config, size_memory=None, rules_path=None):
         self.ipc, self.state, self.config = ipc, state, config
+        from .window_rules import Rules
+        self.rules=Rules(rules_path or state.path.parent/"set-rules.json")
         self.size_memory = size_memory
         self.windows = state.data["windows"]
         self.modes = state.data["modes"]
@@ -37,7 +39,7 @@ class Controller:
         from .config import validate
         candidate = validate(candidate)
         if native:
-            candidate['titlebar_height'] = 32 if candidate['appearance']['titlebars_enabled'] else 0
+            candidate['titlebar_height'] = 0
             # Native side validates every field before committing any of them.
             self.ipc.configure_appearance(candidate['appearance'])
         self.config = candidate
@@ -119,7 +121,7 @@ class Controller:
         return workarea(monitor, self.config["gap"])
 
     def bounds(self, client):
-        return content_rect(self.frame_bounds(client), 0 if ".floatland-csd-" in client.get("class", "") else self.config["titlebar_height"])
+        return self.frame_bounds(client)
 
     def dispatch(self, client, command):
         self.ipc.dispatch(command, address(client["address"]))
@@ -176,17 +178,18 @@ class Controller:
             if record.get("applied") != desired:
                 self.apply(client, record, index)
             self.sync_restore(client, record)
+        self.rules.apply(self)
         self.pip.raise_all()
         self.state.save()
 
-    def active(self, target=None, pid=None):
+    def active(self, target=None, pid=None, allow_fullscreen=False, allow_pinned=False):
         target = target or self.ipc.query("activewindow").get("address")
         client = next((c for c in self.clients if c["address"] == target), None)
         if client is not None and pid is not None and client.get("pid") != pid:
             raise ValueError("Titlebar target no longer belongs to the original process")
-        if client is None or (not self.eligible(client) and not self.pip.active(client)):
+        if client is None or (not self.eligible(dict(client,pinned=False) if allow_pinned else client) and not self.pip.active(client)):
             raise ValueError("No eligible active window (special, pinned and excluded windows are ignored)")
-        if client.get("fullscreen", 0):
+        if client.get("fullscreen", 0) and not allow_fullscreen:
             raise ValueError("Exit fullscreen/maximized compositor mode before changing this window")
         return client
 
@@ -226,7 +229,7 @@ class Controller:
     def bars_event(self, payload):
         """Versioned native bridge; never fall back to the focused window."""
         version, action, target, process, value = payload.split(",")
-        if version != "1" or action not in ("pip", "close", "minimize", "maximize", "snap", "drag-start", "drag-restored", "drag-end"):
+        if version != "1" or action not in ("windows-menu", "settings", "rules-menu", "rule-above", "rule-all_workspaces", "open-config", "pin", "fullscreen", "pin-above", "pip", "close", "minimize", "maximize", "snap", "drag-start", "drag-restored", "drag-end"):
             raise ValueError("Unsupported bars event")
         if not target or not process.isdecimal() or int(process) <= 0:
             raise ValueError("Bars event requires a window address and positive PID")
@@ -259,27 +262,34 @@ class Controller:
 
     def command(self, action, value=None, target=None, pid=None):
         self.refresh()
+        if action in ('windows-menu','settings','rules-menu','open-config') or action.startswith('rule-'):
+            return self.settings_action(action,target,pid)
+        if action == "fullscreen":
+            client=self.active(target,pid,allow_fullscreen=True)
+            self.dispatch(client,"fullscreen")
+            return {"window":client["address"],"action":action}
+        if action == "window-menu":
+            selected=target or self.ipc.query("activewindow").get("address")
+            client=next((w for w in self.clients if w["address"]==selected and w.get("mapped",True)
+                         and (pid is None or w.get("pid")==pid)),None)
+            if not client:
+                raise ValueError("Menu target unavailable")
+            self.ipc.window_menu(client)
+            return {"window":client["address"],"menu":True}
+        if action == "pin-above":
+            client=self.active(target,pid,allow_pinned=True)
+            return {"window":client["address"],"above":self.pip.toggle_above(client)}
         if action == "pip":
             client = self.active(target, pid)
             return {"window": client["address"], "pip": self.pip.toggle(client)}
         if action in ("maximize", "minimize", "restore", "snap", "window-toggle", "pin"):
             selected = target or self.ipc.query("activewindow").get("address")
             client = next((w for w in self.clients if w["address"] == selected), None)
-            if client and self.pip.active(client):
+            if client and self.windows.get(client["address"],{}).get("pip"):
                 client = self.active(selected, pid)
                 self.pip.restore(client)
                 if action in ("maximize", "restore", "pin"):
                     return {"window": selected, "pip": False}
-        if action == "qt-action":
-            if (not isinstance(value, dict) or value.get("action") not in ("close", "minimize", "maximize")
-                    or not isinstance(value.get("class"), str) or ".floatland-csd-" not in value["class"]
-                    or type(value.get("pid")) is not int):
-                raise ValueError("Invalid Qt decoration action")
-            candidates = [w for w in self.clients if w.get("class") == value["class"] and w.get("pid") == value["pid"]]
-            if len(candidates) != 1:
-                raise ValueError("Qt decoration window is unavailable or ambiguous")
-            return self.command(value["action"], target=candidates[0]["address"], pid=value["pid"])
-
         if action == 'alt-tab':
             return self.tasks.next(value == 'reverse')
         if action == 'alt-tab-commit':
@@ -288,6 +298,13 @@ class Controller:
             return self.tasks.cancel()
         if action == 'overview':
             return self.tasks.overview()
+        if action == "windows":
+            return {"api_version":1,"windows":[{
+                "address":w["address"],"pid":w.get("pid"),"class":w.get("class",""),"title":w.get("title",""),
+                "workspace":workspace(w),"floating":bool(w.get("floating")),"pinned":bool(w.get("pinned")),
+                "above":bool(self.windows.get(w["address"],{}).get("above")),
+                "minimized":"minimized" in self.windows.get(w["address"],{})
+            } for w in self.clients if w.get("mapped",True) and not w.get("override_redirect")]}
         if action == "status":
             return {"version": __version__, "bars_protocol": 1, "modes": self.modes, "default_mode": self.config["default_mode"],
                     "workspace_modes": self.config["workspace_modes"],
@@ -319,10 +336,12 @@ class Controller:
             result = {"restored": client["address"]}
         elif action == "pin":
             # Pinned windows are deliberately not "eligible", yet they must be unpinnable.
-            target = self.ipc.query("activewindow").get("address")
+            target = target or self.ipc.query("activewindow").get("address")
             client = next((c for c in self.clients if c["address"] == target), None)
             if client is None or not client.get("mapped", True) or workspace(client).startswith("special"):
                 raise ValueError("No window to pin")
+            if pid is not None and client.get("pid") != pid:
+                raise ValueError("Window identity changed")
             pinned = bool(client.get("pinned"))
             if not pinned and not client["floating"]:
                 raise ValueError("Only floating windows can be pinned")
@@ -406,3 +425,55 @@ class Controller:
         self.windows.clear()
         self.modes.clear()
         self.state.save()
+
+    def settings_action(self,action,target=None,pid=None):
+        self.rules.reload()
+        if action=='open-config':
+            import subprocess
+            from .lua_config import config_home
+            config_home().mkdir(parents=True,exist_ok=True)
+            subprocess.Popen(['xdg-open',str(config_home())],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            return {'opened':str(config_home())}
+        if action in ('settings','windows-menu'):
+            return self.settings_panel()
+        w=next((w for w in self.clients if w['address']==target and w.get('pid')==pid),None)
+        if not w: raise ValueError('Window closed or identity changed')
+        record=self.record(w)
+        values={'above':bool(record.get('above')),
+                'all_workspaces':bool(w.get('pinned'))}
+        saved=self.rules.match(w)
+        if saved:
+            values.update({k:saved[k] for k in values if k in saved})
+        if action.startswith('rule-'):
+            flag=action[5:]
+            self.rules.set(w,flag,not values[flag]); record.pop('rule_applied',None)
+            self.rules.apply(self); self.state.save(); self.refresh()
+            return self.settings_panel((target,pid))
+        expanded=getattr(self,'settings_expanded',None)
+        return self.settings_panel(None if expanded==(target,pid) else (target,pid))
+
+    def settings_panel(self,expanded=None):
+        self.settings_expanded=expanded
+        rows=[{'label':'Floatland settings','action':''},
+              {'label':'Open configuration folder','action':'open-config'},
+              {'label':'Windows — click to edit saved rules','action':''}]
+        labels={'above':'Always on top','all_workspaces':'All workspaces'}
+        for w in self.clients:
+            if not w.get('mapped',True) or w.get('override_redirect'): continue
+            target,pid=w['address'],w['pid']
+            opened=expanded==(target,pid)
+            rows.append({'label':('▾ ' if opened else '▸ ')+(w.get('title') or w.get('class') or target)[:200],
+                         'action':'rules-menu','address':target,'pid':pid})
+            if not opened: continue
+            record=self.record(w)
+            values={'above':bool(record.get('above')),
+                    'all_workspaces':bool(w.get('pinned'))}
+            saved=self.rules.match(w)
+            if saved: values.update({k:saved[k] for k in values if k in saved})
+            for flag in ('above','all_workspaces'):
+                rows.append({'label':'    '+labels[flag],
+                             'action':'rule-'+flag, 'address':target,'pid':pid,
+                             'checked':values[flag]})
+        if len(rows)==3: rows.append({'label':'No open windows','action':''})
+        self.ipc.menu_page(rows)
+        return {'settings':True,'saved_rules':str(self.rules.path)}

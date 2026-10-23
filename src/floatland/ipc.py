@@ -49,6 +49,15 @@ class Hyprland:
 
     def dispatch(self, command, arguments):
         # Controller operation names are internal; never send legacy dispatch IPC.
+        if command == 'focuswindow':
+            target = arguments.removeprefix('address:')
+            client = next((w for w in self.query('clients') if w['address'] == target), None)
+            if not client:
+                raise IPCError('Focus target no longer exists')
+            self.evaluate('if not (hl.plugin and hl.plugin.floatland and hl.plugin.floatland.focus and '
+                          'hl.plugin.floatland.focus(' + lua_string(target) + ',' + str(int(client['pid'])) + ')) then '
+                          + dispatch_lua(command, arguments) + ' end', command)
+            return
         self.evaluate(dispatch_lua(command, arguments), command)
 
     def evaluate(self, source, operation="eval"):
@@ -71,9 +80,6 @@ class Hyprland:
         self.evaluate('assert(hl.plugin.floatland.tasks, "Floatland native task UI not loaded"); '
                       'hl.plugin.floatland.tasks(' + str(kind) + ',{' + entries + '},' + str(selected) + ')', 'task switcher')
 
-    def prepare_switcher(self, generation):
-        self.evaluate("hl.plugin.floatland.prepare_tab(" + str(int(generation)) + ")", "prepare switcher")
-
     def prepare_overview(self, generation):
         self.evaluate('hl.plugin.floatland.prepare_overview(' + str(int(generation)) + ')', 'prepare overview')
 
@@ -91,6 +97,18 @@ class Hyprland:
                       str(int(client['pid'])) + ',' + ('true' if remember else 'false') + ') end',
                       'save minimized preview' if remember else 'forget minimized preview')
 
+    def menu_page(self, rows):
+        fields=[]
+        for row in rows:
+            fields.append('{label='+lua_string(row['label'])+',action='+lua_string(row['action'])+
+                          ',address='+lua_string(row.get('address',''))+',pid='+str(int(row.get('pid',0)))+
+                          ',check='+('true' if 'checked' in row else 'false')+
+                          ',checked='+('true' if row.get('checked') else 'false')+'}')
+        self.evaluate('hl.plugin.floatland.menu_page({'+','.join(fields)+'})','window settings')
+
+    def window_menu(self, w):
+        self.evaluate('hl.plugin.floatland.window_menu(' + lua_string(w['address']) + ',' + str(int(w['pid'])) + ')', 'window menu')
+
     def set_pip(self, w, enabled):
         self.evaluate('hl.plugin.floatland.pip(' + lua_string(w['address']) + ',' + str(int(w['pid']))
                       + ',' + ('true' if enabled else 'false') + ')', 'configure PiP')
@@ -107,8 +125,7 @@ class Hyprland:
                       'hl.plugin.floatland.overview_active(false) end', 'close overview')
 
     def poll_overview(self):
-        # Native overview has no external provider whose state needs polling.
-        pass
+        self.evaluate('hl.plugin.floatland.tick_ui()', 'tick window controls')
 
     def resync_bars(self):
         self.evaluate('if hl.plugin and hl.plugin.floatland and hl.plugin.floatland.refresh then '
@@ -181,6 +198,8 @@ def dispatch_lua(command, arguments):
         expression = 'hl.dsp.window.pin({window = w, action = "' + params + '"})'
     elif command == "focuswindow":
         expression = "hl.dsp.focus({window = w})"
+    elif command == "fullscreen":
+        expression = 'hl.dsp.window.fullscreen({window = w, action = "toggle", mode = "fullscreen"})'
     elif command == "closewindow":
         expression = "hl.dsp.window.close({window = w})"
     else:

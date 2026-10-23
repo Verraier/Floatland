@@ -170,44 +170,12 @@ int main() {
     assert(easeOverview(0)==0 && easeOverview(1)==1);
     const auto halfway=interpolate({10,20,100,80},{110,220,200,160},.5);
     assert(halfway.x==60 && halfway.y==120 && halfway.w==150 && halfway.h==120);
-    for (int count=1;count<=100;++count) {
-        for (Rect bounds : {Rect{-1920,40,1800,900},Rect{40,60,720,480}}) {
-            std::vector<Point> sizes;
-            for(int i=0;i<count;++i) sizes.push_back({i%2?500.0:1400.0,i%2?1200.0:700.0});
-            auto cards=overviewCards(bounds,sizes);
-            assert(cards.size()==sizes.size());
-            for(size_t i=0;i<cards.size();++i) {
-                const auto a=cards[i];
-                assert(a.w>0 && a.h>0 && a.x>=bounds.x && a.y>=bounds.y);
-                assert(a.x+a.w<=bounds.x+bounds.w+.01 && a.y+a.h<=bounds.y+bounds.h+.01);
-                for(size_t j=i+1;j<cards.size();++j) {
-                    const auto b=cards[j];
-                    assert(a.x+a.w<=b.x || b.x+b.w<=a.x || a.y+a.h<=b.y || b.y+b.h<=a.y);
-                }
-            }
-        }
-    }
-    const Rect overviewBounds{0,0,1600,900};
-    const auto few=overviewCards(overviewBounds,std::vector<Point>(3,{1000,700}));
-    const auto many=overviewCards(overviewBounds,std::vector<Point>(24,{1000,700}));
-    assert(many.size()==24 && many[0].w<few[0].w && many[0].h<few[0].h);
-    const auto preview=overviewPreview(few[0],{1000,700});
-    assert(preview.x>=few[0].x && preview.y>=few[0].y);
-    assert(preview.x+preview.w<=few[0].x+few[0].w);
-    assert(preview.y+preview.h<=few[0].y+few[0].h);
+    const Rect card{100,200,240,164};
+    const auto preview=overviewPreview(card,{1000,700});
+    assert(preview.x>=card.x && preview.y>=card.y);
+    assert(preview.x+preview.w<=card.x+card.w);
+    assert(preview.y+preview.h<=card.y+card.h);
     assert(std::abs(preview.w/preview.h-1000./700)<1e-9);
-    const std::vector<Point> mixedSources{{3840,2160},{1000,700},{500,900}};
-    const auto balanced=overviewCards(overviewBounds,mixedSources);
-    const auto large=overviewPreview(balanced[0],mixedSources[0]);
-    const auto medium=overviewPreview(balanced[1],mixedSources[1]);
-    assert(large.w*large.h < medium.w*medium.h*2);
-    const auto repeated=overviewCards(overviewBounds,mixedSources);
-    for(size_t i=0;i<balanced.size();++i) {
-        assert(balanced[i].x==repeated[i].x && balanced[i].y==repeated[i].y);
-        const auto fitted=overviewPreview(balanced[i],mixedSources[i]);
-        assert(std::abs(fitted.w/fitted.h-mixedSources[i].x/mixedSources[i].y)<1e-9);
-        assert(fitted.w<=mixedSources[i].x && fitted.h<=mixedSources[i].y);
-    }
     Click click;
     click.begin(Control::Close, {0, 0});
     assert(click.release(Control::Maximize, false) == Control::None);

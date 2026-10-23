@@ -6,7 +6,6 @@ from test_floatland import FakeHyprland, window
 from floatland.controller import Controller
 from floatland.config import DEFAULTS
 from floatland.state import State
-from floatland import overview
 from floatland.ipc import IPCError
 
 class TaskTests(unittest.TestCase):
@@ -194,31 +193,3 @@ class TaskTests(unittest.TestCase):
     def test_other_special_workspaces_are_excluded(self):
         self.ipc.clients[1]['workspace'] = {'id': -10, 'name': 'special:other'}
         self.assertEqual(self.c.command('alt-tab')['selected'], '0x3')
-
-class OverviewTests(unittest.TestCase):
-    def test_loaded_provider_does_not_install_again(self):
-        cmd = Mock()
-        overview.ensure(cmd, lambda: [{'name':'Hyprtasking'}])
-        cmd.assert_not_called()
-
-    def test_install_checks_loaded_provider(self):
-        command = Mock(return_value='')
-        plugins = Mock(side_effect=[[], [{'name': 'Hyprtasking'}]])
-        with patch('floatland.overview.shutil.which', return_value='/bin/hyprpm'), patch('floatland.overview.interactive') as run:
-            run.return_value = 0
-            overview.ensure(command, plugins)
-        self.assertIn(['hyprpm','add',overview.REPOSITORY], [c.args[0] for c in run.call_args_list])
-
-    def test_failed_install_stops_without_false_success(self):
-        with patch('floatland.overview.shutil.which', return_value='/bin/hyprpm'), patch('floatland.overview.interactive') as run:
-            run.return_value = 1
-            with self.assertRaises(IPCError): overview.ensure(Mock(return_value=''), lambda: [])
-
-    def test_configuration_preserves_previous_values(self):
-        ipc = Mock()
-        ipc.query.side_effect = [[{'height':1080,'scale':1}], {'str':'grid'}, {'int':0}, {'float':300.0}, {'int':272}, {'int':273}]
-        saved = overview.configure(ipc)
-        self.assertEqual(saved, {'layout':'grid','linear:top':0,'linear:height':300.0,'drag_button':272,'select_button':273})
-        self.assertIn('linear={top=1,height=320.0}', ipc.evaluate.call_args.args[0])
-        overview.apply(ipc, saved)
-        self.assertIn('layout="grid",linear={top=0,height=300.0}', ipc.evaluate.call_args.args[0])

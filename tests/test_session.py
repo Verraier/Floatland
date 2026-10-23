@@ -17,8 +17,6 @@ class SessionTests(unittest.TestCase):
         for target, value in [('ROOT', self.root), ('instance_dir', lambda: self.root),
                               ('load', lambda **kwargs: {'titlebar_height': 0})]:
             p = patch.object(session, target, value); p.start(); self.addCleanup(p.stop)
-        for target in ('ensure', 'configure', 'apply'):
-            p = patch.object(session.overview, target); p.start(); self.addCleanup(p.stop)
         for target in ('command', 'plugins', 'stop_previous', 'plugin_operation', 'Hyprland'):
             p = patch.object(session, target); setattr(self, target, p.start()); self.addCleanup(p.stop)
         self.Hyprland.return_value.query.return_value = {'version': '0.56.2'}
@@ -32,7 +30,7 @@ class SessionTests(unittest.TestCase):
     def test_build_load_run_and_unload_same_version(self):
         session.start()
         self.stop_previous.assert_called_once()
-        self.run.assert_awaited_once_with(self.root, {'titlebar_height': 32}, unified=True)
+        self.run.assert_awaited_once_with(self.root, {'titlebar_height': 0}, unified=True)
         target = self.root/('floatland-bars-'+session.__version__+'.so')
         self.assertEqual(self.plugin_operation.call_args_list[0].args, ('load', target))
         self.assertEqual(self.plugin_operation.call_args_list[-1].args, ('unload', target))

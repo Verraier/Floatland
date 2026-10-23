@@ -1,131 +1,47 @@
-<p align="center">
-  <img src="examples/Floatland.svg" alt="Floatland Logo" width="200">
-</p>
+# Floatland Lite — 0.7.0-lite3
 
-<h1 align="center">FloatLand</h1>
+Standalone floating window management for Hyprland. This is the first test release of the `lite` branch; it does not replace stable main yet.
 
-# FloatLand
+Developed with AI assistance. [Русский](README.ru.md) · [Configuration and architecture](docs/lite.md) · [Shell API](docs/shell-api.md)
 
-**English** · [Русский](README.ru.md)
+## What stays
 
-> **Disclaimer:** this project was made with AI.
+- Floating/tiling modes, remembered geometry and per-application size memory.
+- A compact capsule with close, minimize and fullscreen controls, an explicit drag handle, window menu, SVG icons and configurable effects.
+- A tiny passive indicator when the capsule is collapsed. Hover reveals the controls; only the handle starts dragging. Right-click opens the window menu.
+- Snap zones and the top snap palette, always-on-top and all-workspaces controls.
+- Icons-only Alt+Tab and a compact right-hand overview sidebar on Super+G.
+- Lua settings, reload, window rules, logs and an addressed local control socket.
 
-Floating window management for [Hyprland](https://hyprland.org/) with quality-of-life features built in.
-This is not a serious project — I made it for myself — but you may like it too.
+Toolkit integrations and full-width external titlebars are removed. Overview no longer suppresses normal windows or installs renderWindow/renderFadeouts hooks. It still captures thumbnails through the native plugin; it is not independent of Hyprland's graphics ABI.
 
-**Target:** Hyprland **0.56.2** (headers of the exact installed version are required to build).
+## Run
 
-## Features
-
-- **Floating / tiling toggle** with remembered window geometry
-- **Title bars** — native, configurable buttons (close / minimize / maximize), animations
-- **Snapping** — drag a title bar to a screen edge or the top palette
-- **Alt+Tab** window switcher with icons
-- **Overview** — window overview of the current workspace (`Super+G`)
-- **Lua configuration** with live reload on save
-
-- **You can find preview videos in "examples" folder**
-
-## Requirements
-
-- Python 3.9+
-- CMake 3.22+, a C++23 compiler, pkg-config
-- Hyprland 0.56.2 headers
-- pixman, libdrm, libinput, libudev, wayland-server, xkbcommon, pangocairo, librsvg
-- A Lua interpreter (`lua`, `lua5.4`, `lua5.3` or `luajit`) — or the Python package `lupa`
-
-## Install & run
+Extract the archive, enter its folder and run:
 
 ```sh
-git clone https://github.com/Verraier/Floatland.git
-cd Floatland
 python3 run.py
 ```
 
-Building, loading the plugin and starting the daemon are automatic. Keep the terminal open.
-Log: `logs/session.log`. Stop with `Ctrl+C` or `python3 run.py stop`.
+The launcher builds and loads the plugin and starts the daemon. Keep this terminal open. Stop the old Floatland session before launching lite: both use the same per-session lock/socket. Disable any old global integration launcher overrides through the old installation before removing it.
 
-Your Hyprland config is **not** modified automatically. To wire it up manually, see
-[examples/hyprland.lua](examples/hyprland.lua).
-
-## Configuration
-
-On first run, a config is created in `~/.config/floatland/` (respects `$XDG_CONFIG_HOME`):
-
-```text
-~/.config/floatland/
-├── init.lua
-└── config/
-    ├── windows.lua
-    ├── titlebars.lua
-    ├── snapping.lua
-    ├── overview.lua
-    ├── switching.lua
-    ├── bindings.lua
-    └── theme.lua
-```
+Requirements: Linux, Hyprland **0.56.2** with matching development headers, Python 3.9+, CMake 3.22+, a C++23 compiler, pkg-config, pixman, libdrm, libinput, libudev, wayland-server, xkbcommon, pangocairo and librsvg. Lua requires `lua`, `lua5.4`, `lua5.3`, `luajit` or Python `lupa`.
 
 ```sh
-python3 run.py config init        # create the config without starting Hyprland
-python3 run.py config path        # print the path to init.lua
-python3 run.py config show        # validate and show effective values
-python3 run.py config reference   # documented list of all options
-python3 run.py reload             # apply manually (auto-reload also happens on save)
+python3 run.py config path
+python3 run.py reload
+python3 run.py windows
+python3 run.py stop
 ```
 
-Full reference: [docs/configuration.md](docs/configuration.md).
+Settings live in `~/.config/floatland-lite/` (or `$XDG_CONFIG_HOME/floatland-lite/`). Old Floatland settings are not migrated automatically. Edit these installed settings, not `src/floatland/defaults`. Logs: `logs/session.log`. Optional autostart example: [examples/hyprland.lua](examples/hyprland.lua).
 
-## Controls
-
-| Key / action | What it does |
-|---|---|
-| `Alt+Tab` | Switch windows (release Alt to select, `Esc` to cancel) |
-| `Super+G` | Overview of the current workspace |
-| Drag title bar to edge / palette | Snap |
-| `python3 run.py toggle` | Floating ⇄ tiling |
-| `python3 run.py snap left`, `maximize`, `restore`, `center`, `minimize`, `pin` | Window commands |
-
-## Development
+## Validation
 
 ```sh
-python3 tools/check.py   # Python/Lua tests + standalone C++ tests
+python3 tools/check.py
 ```
 
-Layout: `src/floatland/` (Python), `native/` (C++ plugin), `tests/`, `docs/`, `examples/`.
-See [docs/architecture.md](docs/architecture.md).
+This runs Python/Lua regressions and five standalone C++ logic suites. It does not compile the complete plugin or verify graphics. Full Linux build, blur, input handling and multi-monitor testing remain required; see [smoke checks](docs/linux-smoke-test.md).
 
-## Status
-
-Tested logic-wise on macOS; the full plugin needs more testing on real Hyprland.
-Expect rough edges. Known: `Alt+Shift+Tab` (switching backwards) does **not** work yet. See [CHANGELOG.md](CHANGELOG.md) and [docs/bugs/](docs/bugs/) for known issues.
-
-## Credits
-
-Big thank you — without these projects this wouldn't have happened:
-
-- **[hyprstack-shell](https://github.com/hase9awa/hyprstack-shell)** by hase9awa and contributors (GPL-3.0) —
-  the floating/tiling model, geometry memory and snap zones were studied from it; `native/check_sdk.py`
-  adapts its header/ABI check.
-- **[hyprbars](https://github.com/hyprwm/hyprland-plugins/tree/428bfcd1c9ee34965400bb359349f518140c9920/hyprbars)**
-  by Hypr Development (BSD-3-Clause) — the title bar decoration / render-pass / input approach in
-  `native/titlebar.cpp` is derived from it.
-- **[Hyprland](https://github.com/hyprwm/Hyprland)** by vaxerski and contributors (BSD-3-Clause) — the compositor
-  and plugin API this is built on (checked against v0.56.2).
-- **[Hyprtasking](https://github.com/raybbian/hyprtasking)** by Raymond Bian and contributors (BSD-3-Clause) —
-  overview API and input behaviour were checked against it; the optional legacy integration in
-  `src/floatland/overview.py` uses it via hyprpm.
-- Libraries used at build/run time: Pango, Cairo, librsvg, pixman, libdrm, libinput, xkbcommon,
-  wayland, and Lua / [lupa](https://github.com/scoder/lupa) for configuration.
-
-Details and third-party notices: [NOTICE.md](NOTICE.md), [native/NOTICE.md](native/NOTICE.md).
-
-## License
-
-GPL-3.0-or-later — see [LICENSE](LICENSE). Native code derived from Hyprbars keeps its
-BSD-3-Clause notice in [native/LICENSE.hyprbars](native/LICENSE.hyprbars).
-
-## Stable 0.6.7
-
-This release promotes the tested 0.6.7e behavior: window PiP mode, configurable button diameter, updated button motion, XWayland size-memory safeguards, and the accumulated switcher/overview improvements. Right-click a titlebar or run `python3 run.py pip` to toggle the current PiP mode. Add `button_size = 14,` (8..20 logical pixels) to `~/.config/floatland/config/titlebars.lua`.
-
-Qt client decorations remain an optional experiment. The replacement context menu and hover capsule are planned separately in [0.6.8e](docs/experiment-0.6.8e.md).
+License and attribution are retained in LICENSE, NOTICE.md and native/LICENSE.hyprbars.

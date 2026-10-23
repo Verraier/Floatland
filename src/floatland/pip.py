@@ -7,11 +7,51 @@ class PictureInPicture:
         self.c = controller
 
     def active(self, client):
-        return bool(self.c.windows.get(client['address'], {}).get('pip'))
+        record=self.c.windows.get(client['address'], {})
+        return bool(record.get('pip') or record.get('above'))
+
+    def toggle_above(self, client):
+        c=self.c
+        record=c.record(client)
+        if record.get('pip'):
+            self.restore(client)
+            return False
+        enabled=not record.get('above')
+        if enabled:
+            saved = {'floating': bool(client['floating'])}
+            c.ipc.set_pip(client, True)
+            try:
+                c.dispatch(client, 'setfloating')
+                client['floating'] = True
+            except Exception:
+                # Roll back only the operations this mode owns.
+                try:
+                    c.ipc.set_pip(client, False)
+                    if not saved['floating']:
+                        c.dispatch(client, 'settiled')
+                        client['floating'] = False
+                except Exception:
+                    pass
+                raise
+            record['above'] = saved
+            c.state.save()
+            self.raise_all()
+        else:
+            saved = record['above']
+            c.ipc.set_pip(client, False)
+            if not saved['floating']:
+                c.dispatch(client, 'settiled')
+                client['floating'] = False
+            del record['above']
+        c.state.save()
+        return enabled
 
     def toggle(self, client):
         c = self.c
         record = c.record(client)
+        if record.get('above'):
+            self.toggle_above(client)
+            return False
         if self.active(client):
             self.restore(client)
             return False
@@ -44,6 +84,9 @@ class PictureInPicture:
     def restore(self, client):
         c = self.c
         record = c.windows[client['address']]
+        if record.get('above'):
+            self.toggle_above(client)
+            return
         saved = record.get('pip')
         if not saved:
             return

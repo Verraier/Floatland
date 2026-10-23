@@ -16,7 +16,6 @@ from . import __version__
 from .cli import daemon_request
 from .config import load
 from .daemon import run
-from . import overview
 from .ipc import Hyprland, IPCError, instance_dir
 
 LOG = logging.getLogger('floatland')
@@ -133,7 +132,7 @@ def start():
         LOG.info('Configuration: %s', config_home() / 'init.lua')
         LOG.info('Edit user Lua files here, not src/floatland/defaults. Changes reload automatically.')
         config = load(create=True)
-        config['titlebar_height'] = 32 if config.get('appearance', {}).get('titlebars_enabled', True) else 0
+        config['titlebar_height'] = 0
         ipc = Hyprland(directory)
         ipc.check_api()
         LOG.info('Hyprland: %s', json.dumps(ipc.query('version')))
@@ -142,7 +141,6 @@ def start():
         command(['cmake', '-S', ROOT / 'native', '-B', build, '-DCMAKE_BUILD_TYPE=Debug'])
         command(['cmake', '--build', build, '-j2'])
         command(['ctest', '--test-dir', build, '--output-on-failure'])
-        overview_settings = None
         loaded = plugins()
         conflicts = any(p.get('name') in ('hyprbars', 'floatland-bars', 'floatland-titlebars') for p in loaded)
         previous = mapped_plugins() if conflicts else []
@@ -175,8 +173,6 @@ def start():
         finally:
             try:
                 ipc.close_overview()
-                if overview_settings is not None:
-                    overview.apply(ipc, overview_settings)
             except Exception:
                 LOG.exception("Could not restore overview settings")
             if installed:
